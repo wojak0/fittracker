@@ -40,7 +40,8 @@ schema:
 	plantuml -tsvg schema.puml
 
 test:
-	$(PYTHON) -m pytest -q
+	$(PYTHON) -m pytest -q tests
+	cd $(FRONTEND_DIR) && uv run pytest -q
 
 up:
 	docker compose up -d --build
@@ -129,7 +130,7 @@ help:
 	@echo "  all             – build all PDF documents"
 	@echo "  docs            – build all PDF documents"
 	@echo "  schema          – render schema.puml as schema.svg"
-	@echo "  test            – run backend tests"
+	@echo "  test            – run backend and frontend tests"
 	@echo "  up              – build and start PostgreSQL + FastAPI"
 	@echo "  down            – stop backend containers"
 	@echo "  logs            – follow backend container logs"
