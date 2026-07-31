@@ -1,0 +1,24 @@
+[project]
+name = "fittracker-frontend"
+version = "0.1.0"
+description = "Tkinter desktop frontend for the Fit Tracker REST API"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.32,<3.0",
+]
+
+[project.scripts]
+fittracker = "fittracker_frontend.__main__:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fittracker_frontend"]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.0,<7.0",
+    "pytest>=8.0,<9.0",
+]
