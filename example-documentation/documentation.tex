@@ -1,0 +1,254 @@
+% ============================================================
+%  TERM PROJECT – EXAMPLE DOCUMENTATION
+%  Databases · THGA Bochum
+%
+%  This is a worked example of the *documentation* deliverable.
+%  It shows the expected structure and level of detail. Your own
+%  documentation describes your own application.
+% ============================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{thga-db}
+
+\renewcommand{\thgaKurs}{Databases}
+\renewcommand{\thgaDatum}{Summer Term 2026}
+
+\begin{document}
+\thispagestyle{empty}
+\thgaTitel{Term Project – Documentation (Example)}%
+{Club Library: a database-backed lending system}
+
+\begin{infobox}
+\textbf{Author:} Jane Doe (example) \\
+\textbf{Module:} Introduction to Database Management Systems · THGA Bochum \\
+\textbf{Stack:} PostgreSQL · FastAPI · Docker Compose · tkinter (\texttt{.deb}) \\
+\textbf{Repository:} \url{https://github.com/<user>/club-library}
+\end{infobox}
+
+\tableofcontents
+\vspace{1em}
+
+% ============================================================
+\section{Introduction and motivation}
+% ============================================================
+
+Small clubs often manage their library with a spreadsheet: one row per book, a
+column scribbled with the current borrower. This breaks down as soon as two
+people edit the file, and it cannot answer questions such as \emph{``which books
+are currently on loan?''} without manual counting.
+
+\textbf{Club Library} replaces that spreadsheet with a proper relational system.
+It manages \textbf{books}, \textbf{members} and \textbf{loans}, exposes the data
+through a REST API and offers a small desktop frontend for the librarian.
+
+\begin{beispielbox}
+\textbf{Usage scenario.} A member returns two books. The librarian opens the
+frontend, searches for the member, sees their two open loans and marks both as
+returned. The stock counters update immediately, and the ``available books''
+view now lists both titles again.
+\end{beispielbox}
+
+% ============================================================
+\section{Data model}
+% ============================================================
+
+The domain has three entity types. A \textbf{member} can borrow many
+\textbf{books} over time, and a book can be borrowed by many members -- an
+\texttt{N:M} relationship that is resolved by the \textbf{loan} entity (L 02,
+L 03).
+
+\begin{beispielbox}
+\textbf{ER model (textual).}
+\begin{itemize}[leftmargin=1.4em, topsep=2pt]
+  \item \textbf{member} (1) \;--\; borrows \;--\; (N) \textbf{loan}
+  \item \textbf{book} (1) \;--\; is borrowed in \;--\; (N) \textbf{loan}
+\end{itemize}
+Thus \textbf{member} \texttt{N:M} \textbf{book}, resolved through
+\textbf{loan}.
+\end{beispielbox}
+
+\subsection{Relational schema}
+
+Derived from the ER model, with primary keys underlined and foreign keys in
+italics:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \texttt{member}(\underline{id}, name, email)
+  \item \texttt{book}(\underline{id}, title, author, isbn, stock)
+  \item \texttt{loan}(\underline{id}, \emph{member\_id}, \emph{book\_id},
+        borrowed\_on, due\_on, returned\_on)
+\end{itemize}
+
+\textbf{Normalisation.} Every non-key attribute depends only on the whole
+primary key of its table, and there are no transitive dependencies: a member's
+email lives only in \texttt{member}, a book's author only in \texttt{book}, and
+a loan references members and books by their keys rather than duplicating their
+data. The schema is therefore in \textbf{3NF} (L 04).
+
+% ============================================================
+\section{Database (PostgreSQL)}
+% ============================================================
+
+The schema and seed data are created by an init script that PostgreSQL runs on
+first start (L 07, L 09).
+
+\begin{lstlisting}[language=SQL, caption={init.sql (excerpt) -- schema and seed data}]
+CREATE TABLE member (
+    id    INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    name  VARCHAR(120) NOT NULL,
+    email VARCHAR(200) UNIQUE
+);
+
+CREATE TABLE book (
+    id     INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    title  VARCHAR(200) NOT NULL,
+    author VARCHAR(120) NOT NULL,
+    isbn   CHAR(13) UNIQUE,
+    stock  INTEGER NOT NULL DEFAULT 1 CHECK (stock >= 0)
+);
+
+CREATE TABLE loan (
+    id           INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    member_id    INTEGER NOT NULL REFERENCES member(id),
+    book_id      INTEGER NOT NULL REFERENCES book(id),
+    borrowed_on  DATE NOT NULL DEFAULT CURRENT_DATE,
+    due_on       DATE NOT NULL,
+    returned_on  DATE
+);
+\end{lstlisting}
+
+% ============================================================
+\section{REST API (FastAPI)}
+% ============================================================
+
+The API is the only component that talks to the database (L 08). Read endpoints
+are public; write endpoints require the header \texttt{X-API-Key} (cf.\ DBMS\_09).
+
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\linewidth}{@{}p{1.6cm}p{4.4cm}Xc@{}}
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Purpose} & \textbf{Key} \\
+\midrule
+\texttt{GET}  & \texttt{/books} & books + count of open loans (JOIN + agg.) & -- \\
+\texttt{GET}  & \texttt{/members/\{id\}/loans} & open loans of a member (JOIN) & -- \\
+\texttt{POST} & \texttt{/loans} & lend a book & yes \\
+\texttt{POST} & \texttt{/returns} & return a book & yes \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+The \texttt{/books} endpoint demonstrates a \textbf{JOIN} combined with an
+\textbf{aggregation} (L 06): it counts how many copies of each book are
+currently on loan.
+
+\begin{lstlisting}[language=SQL, caption={Query behind GET /books (JOIN + aggregation)}]
+SELECT b.id, b.title, b.author, b.stock,
+       COUNT(l.id) FILTER (WHERE l.returned_on IS NULL) AS on_loan
+FROM book b
+LEFT JOIN loan l ON l.book_id = b.id
+GROUP BY b.id
+ORDER BY b.title;
+\end{lstlisting}
+
+The write path is guarded by a dependency that checks the API key -- adapted
+from the DBMS\_09 exercise:
+
+\begin{lstlisting}[language=Python, caption={API-key guard (adapted from DBMS\_09)}]
+from fastapi import Header, HTTPException
+import os
+
+def require_api_key(x_api_key: str = Header(...)):
+    if x_api_key != os.environ["API_KEY"]:
+        raise HTTPException(status_code=401, detail="invalid API key")
+\end{lstlisting}
+
+% ============================================================
+\section{Frontend (tkinter, packaged as .deb)}
+% ============================================================
+
+The frontend is a small tkinter application with two tabs: \textbf{Books} (a
+searchable table backed by \texttt{GET /books}) and \textbf{Loans} (a form that
+calls \texttt{POST /loans} and \texttt{POST /returns}). It never touches the
+database directly -- it only calls the API (L 10).
+
+At startup a \textbf{connection dialog} asks for the API URL and the
+\texttt{X-API-Key}; the key is kept in memory for the session only and is never
+written to disk.
+
+\textbf{Packaging.} The application is frozen with PyInstaller and wrapped into a
+Debian package with \texttt{fpm} (L 13), so the lecturer can install and run it
+on the lecture server:
+
+\begin{lstlisting}[caption={Building and installing the .deb}]
+uv run pyinstaller --name club-library --onedir src/club_library/__main__.py
+mkdir -p pkg/usr/bin && cp -r dist/club-library pkg/usr/bin/
+fpm -s dir -t deb --name club-library --version 0.1.0 -C pkg .
+sudo dpkg -i club-library_0.1.0_amd64.deb
+\end{lstlisting}
+
+% ============================================================
+\section{Operation and deployment}
+% ============================================================
+
+The backend runs as two containers, orchestrated by Docker Compose and deployed
+on the lecture server (L 09). Credentials live in a \texttt{.env} file that is
+not committed.
+
+\begin{lstlisting}[caption={docker-compose.yml (excerpt, after L 09)}]
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+  api:
+    build: ./api
+    environment:
+      API_KEY: ${API_KEY}
+    env_file: .env
+    ports: ["8000:8000"]
+    depends_on: [postgres]
+volumes:
+  pg_data:
+\end{lstlisting}
+
+\textbf{Deployment steps on the lecture server.}
+\begin{enumerate}[leftmargin=1.6em, topsep=2pt]
+  \item \texttt{docker compose up -d} -- start database and API.
+  \item \texttt{sudo dpkg -i club-library\_0.1.0\_amd64.deb} -- install the
+        frontend.
+  \item Launch \texttt{club-library}, enter the API URL and the
+        \texttt{X-API-Key} in the connection dialog.
+\end{enumerate}
+
+% ============================================================
+\section{Reflection}
+% ============================================================
+
+The separation into database, API and frontend paid off: the API-key guard and
+the aggregation query could be tested with \texttt{curl} long before the
+frontend existed. The trickiest part was \textbf{return handling} when several
+copies of the same book are on loan at once -- solved by matching a return to
+the oldest open loan of that book. Given more time, transaction isolation
+(L 11) would make concurrent returns fully safe.
+
+% ============================================================
+\section*{Sources and reuse}
+% ============================================================
+\addcontentsline{toc}{section}{Sources and reuse}
+
+Reused with attribution, as permitted:
+\begin{itemize}[leftmargin=1.4em, topsep=2pt]
+  \item API-key guard and Compose file structure -- adapted from
+        \textbf{DBMS\_09} and \textbf{lecture 09}.
+  \item tkinter connection dialog and \texttt{Treeview} layout -- adapted from
+        \textbf{DBMS\_09 (frontend)} and \textbf{lecture 10}.
+  \item PyInstaller / \texttt{fpm} packaging commands -- after \textbf{lecture
+        13}.
+\end{itemize}
+
+\end{document}

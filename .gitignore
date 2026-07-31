@@ -1,0 +1,26 @@
+# LaTeX-Hilfsdateien und generierte PDFs
+out/
+*.aux
+*.log
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.synctex.gz
+
+# Security
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build and package output
+build/
+dist/
+*.egg-info/
+*.deb

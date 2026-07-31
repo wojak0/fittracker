@@ -1,0 +1,16 @@
+.git
+.github
+.env
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+out
+dist
+build
+Pdf files
+example-documentation
+proposal-template
+src
+style
+frontend

@@ -1,0 +1,171 @@
+%% ============================================================
+%%  thga-db.sty – Corporate Design & Layout Package
+%%  Technische Hochschule Georg Agricola (THGA), Bochum
+%%  Kurs: Datenbanken  ·  Dozent: Stephan Bökelmann
+%% ============================================================
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{thga-db}[2026/04/09 THGA Datenbanken Style]
+
+%% ----- Konfigurierbare Metadaten ----------------------------
+%% In jedem Handout / im Skript per \renewcommand überschreiben.
+\newcommand{\thgaKurs}{Datenbanken}
+\newcommand{\thgaDozent}{Stephan Bökelmann}
+\newcommand{\thgaEmail}{sboekelmann@ep1.rub.de}
+\newcommand{\thgaDatum}{\today}
+
+%% ----- Pakete -----------------------------------------------
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[ngerman]{babel}
+\RequirePackage{lmodern}
+\RequirePackage[left=2.5cm, right=2.5cm, top=2.8cm, bottom=2.8cm]{geometry}
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{tikz}
+\RequirePackage{fancyhdr}
+\RequirePackage{titlesec}
+\RequirePackage{enumitem}
+\RequirePackage{booktabs}
+\RequirePackage{listings}
+\RequirePackage{parskip}
+\RequirePackage{mdframed}
+\RequirePackage{microtype}
+\RequirePackage{array}
+\RequirePackage{tabularx}
+\RequirePackage{amsmath}
+\RequirePackage{amssymb}
+\RequirePackage{hyperref}
+
+% Outer-Join-Symbole
+\newcommand{\lojoin}{\mathbin{\text{\small$\bowtie$}\!\!\!\text{\raisebox{-0.25ex}{\small$\subset$}}}}
+\newcommand{\rojoin}{\mathbin{\text{\raisebox{-0.25ex}{\small$\supset$}}\!\!\!\text{\small$\bowtie$}}}
+\newcommand{\fojoin}{\mathbin{\text{\raisebox{-0.25ex}{\small$\supset$}}\!\!\!\text{\small$\bowtie$}\!\!\!\text{\raisebox{-0.25ex}{\small$\subset$}}}}
+
+%% ----- THGA Corporate Design – Farben -----------------------
+\definecolor{THGABlau}{HTML}{003C7C}
+\definecolor{THGARot}{HTML}{E5000F}
+\definecolor{THGABlauDark1}{HTML}{00254C}
+\definecolor{THGABlauDark2}{HTML}{001933}
+\definecolor{THGABlauLight1}{HTML}{417EBF}
+\definecolor{THGABlauLight2}{HTML}{6CA1D9}
+\definecolor{THGABlauLight3}{HTML}{A2C9F2}
+\definecolor{THGABlauLight4}{HTML}{CCE5FF}
+\definecolor{THGAGrauDark}{HTML}{333435}
+\definecolor{THGAGrau}{HTML}{666768}
+\definecolor{THGAGrauLight}{HTML}{C8C9CA}
+\definecolor{THGAGrauPaper}{HTML}{E1E2E3}
+\definecolor{THGAGruen}{HTML}{1F6655}
+\definecolor{THGAGruenLight}{HTML}{69C0AC}
+
+%% ----- Hyperref ---------------------------------------------
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = THGABlau,
+  urlcolor   = THGARot,
+  citecolor  = THGABlau,
+}
+
+%% ----- Listings ---------------------------------------------
+\lstdefinestyle{thgaCode}{
+  basicstyle      = \ttfamily\small,
+  keywordstyle    = \bfseries\color{THGABlau},
+  commentstyle    = \itshape\color{THGAGrau},
+  stringstyle     = \color{THGARot},
+  backgroundcolor = \color{THGAGrauPaper},
+  frame           = single,
+  framerule       = 0.4pt,
+  rulecolor       = \color{THGAGrauLight},
+  numbers         = left,
+  numberstyle     = \tiny\color{THGAGrau},
+  breaklines      = true,
+  showstringspaces= false,
+  tabsize         = 4,
+}
+\lstset{style=thgaCode}
+
+%% ----- Kopf- und Fußzeile -----------------------------------
+%% \thgaDatum und \thgaDozent werden zur Laufzeit expandiert,
+%% sodass \renewcommand im Dokument-Preamble greift.
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{1.5pt}
+\renewcommand{\headrule}{\hbox to\headwidth{%
+  \color{THGABlau}\leaders\hrule height \headrulewidth\hfill}}
+\renewcommand{\footrulewidth}{0.4pt}
+\renewcommand{\footrule}{\hbox to\headwidth{%
+  \color{THGAGrauLight}\leaders\hrule height \footrulewidth\hfill}}
+\fancyhead[L]{\small\textcolor{THGABlau}{\textbf{\thgaKurs}}}
+\fancyhead[R]{\small\textcolor{THGAGrau}{\thgaDozent\ ·\ \thgaDatum}}
+\fancyfoot[L]{\small\textcolor{THGAGrau}{%
+  \href{mailto:\thgaEmail}{\thgaEmail}}}
+\fancyfoot[C]{\small\textcolor{THGAGrau}{THGA Bochum}}
+\fancyfoot[R]{\small\textcolor{THGAGrau}{\thepage}}
+
+%% ----- Abschnittsformatierung -------------------------------
+\titleformat{\section}
+  {\large\bfseries\color{THGABlau}}{\thesection}{1em}{}[\titlerule]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{THGABlauDark1}}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}
+  {\normalsize\itshape\color{THGAGrau}}{\thesubsubsection}{1em}{}
+
+%% ----- Umgebungen -------------------------------------------
+\newmdenv[
+  linecolor=THGABlauLight1, backgroundcolor=THGABlauLight4,
+  linewidth=1.5pt, innerleftmargin=10pt, innerrightmargin=10pt,
+  innertopmargin=8pt, innerbottommargin=8pt, roundcorner=4pt,
+]{infobox}
+
+\newmdenv[
+  linecolor=THGARot, backgroundcolor=white,
+  linewidth=1.5pt, innerleftmargin=10pt, innerrightmargin=10pt,
+  innertopmargin=8pt, innerbottommargin=8pt, roundcorner=4pt,
+]{warnbox}
+
+\newmdenv[
+  linecolor=THGAGruenLight, backgroundcolor=white,
+  linewidth=1.5pt, innerleftmargin=10pt, innerrightmargin=10pt,
+  innertopmargin=8pt, innerbottommargin=8pt, roundcorner=4pt,
+]{beispielbox}
+
+%% ----- Titelblock – Einzelhandout ---------------------------
+%% Aufruf: \thgaTitel{Titel}{Untertitel}
+%% Seite muss mit \thispagestyle{empty} deklariert werden.
+\newcommand{\thgaTitel}[2]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \fill[THGABlau] (current page.north west)
+      rectangle ([yshift=-3.2cm]current page.north east);
+    \fill[THGARot] ([yshift=-3.2cm]current page.north west)
+      rectangle ([yshift=-3.6cm]current page.north east);
+  \end{tikzpicture}%
+  \vspace*{1.2cm}
+  {\color{white}\fontsize{22}{26}\selectfont\bfseries #1}\par
+  \vspace{0.25cm}
+  {\color{THGABlauLight3}\fontsize{13}{16}\selectfont #2}\par
+  \vspace{0.8cm}
+  {\color{THGAGrau}\small
+    Dozent: \thgaDozent \quad
+    \href{mailto:\thgaEmail}{\thgaEmail}
+    \quad Technische Hochschule Georg Agricola, Bochum}
+  \par\vspace{0.4cm}
+  \textcolor{THGARot}{\rule{\linewidth}{1.5pt}}
+  \vspace{0.5cm}
+}
+
+%% ----- Vorlesungstrennseite – Skript ------------------------
+%% Aufruf: \thgaVorlesung{Nummer}{Datum}
+%% Erzeugt eine farbige Trennleiste zwischen den Kapiteln im Skript.
+\newcommand{\thgaVorlesung}[2]{%
+  \newpage
+  \vspace*{1.5cm}
+  \noindent
+  \begin{tikzpicture}
+    \fill[THGABlau] (0, 0) rectangle (\linewidth, 1.6cm);
+    \fill[THGARot]  (0, -0.28cm) rectangle (\linewidth, 0);
+    \node[anchor=west, text=white, font=\large\bfseries]
+      at (12pt, 0.8cm) {Vorlesung #1};
+    \node[anchor=east, text=THGABlauLight3, font=\normalsize]
+      at (\linewidth-12pt, 0.8cm) {#2};
+  \end{tikzpicture}
+  \vspace{1.5cm}\par
+}
