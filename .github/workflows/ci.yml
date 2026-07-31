@@ -1,0 +1,101 @@
+name: Fit Tracker CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run backend tests
+        run: python -m pytest -q tests
+
+  frontend-tests:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        run: python -m pip install uv
+
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: uv sync --frozen
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: uv run pytest -q
+
+  docker-integration:
+    name: Docker integration test
+    runs-on: ubuntu-latest
+
+    env:
+      POSTGRES_USER: fittracker
+      POSTGRES_PASSWORD: ci-only-password
+      POSTGRES_DB: fittracker
+      DATABASE_URL: postgresql+psycopg2://fittracker:ci-only-password@postgres:5432/fittracker
+      API_KEY: ci-test-api-key
+      API_PORT: "8888"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config --quiet
+
+      - name: Build and start services
+        run: docker compose up -d --build
+
+      - name: Wait for and test the API
+        run: |
+          curl \
+            --fail \
+            --retry 15 \
+            --retry-all-errors \
+            --retry-delay 2 \
+            http://localhost:8888/exercises
+
+      - name: Show container logs after failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
