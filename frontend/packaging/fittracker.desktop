@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Fit Tracker
+Comment=Record strength-training workouts
+Exec=/usr/bin/fittracker
+TryExec=/usr/bin/fittracker
+Terminal=false
+Categories=Utility;Education;
+Keywords=fitness;workout;exercise;
+StartupNotify=true

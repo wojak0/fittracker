@@ -1,47 +1,43 @@
 # ============================================================
-#  Makefile – DBMS_10 · Project Proposal for the Term Project
-#  THGA Bochum · Stephan Bökelmann
-#
-#  Builds three PDFs into out/:
-#    - dbms_10        the exercise (src/)
-#    - proposal       the fill-in template (proposal-template/)
-#    - documentation  the worked example (example-documentation/)
-#
-#  Requirement: TeX Live with latexmk (apt install latexmk texlive-full)
+# Fit Tracker – DBMS Term Project
+# THGA Bochum · Lecturer: Stephan Bökelmann
 # ============================================================
 
-LATEXMK  := latexmk
-OUTDIR   := out
-PYTHON   := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
+LATEXMK := latexmk
+OUTDIR := out
+PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-# -cd: latexmk changes into the source file's directory before building,
-#      so \input and the style search path resolve. The output directory
-#      ../out is relative to the source file and therefore always lands in
-#      the repository-level out/.
+FRONTEND_DIR := frontend
+FRONTEND_VERSION := 0.1.0
+FRONTEND_ARCH := amd64
+FRONTEND_BUILD := $(FRONTEND_DIR)/dist/fittracker
+FRONTEND_PKG := $(FRONTEND_DIR)/pkg
+DEB_FILE := $(FRONTEND_DIR)/dist/fittracker-frontend_$(FRONTEND_VERSION)_$(FRONTEND_ARCH).deb
+
 LMKFLAGS := -pdf -interaction=nonstopmode -halt-on-error \
             -cd -output-directory=../$(OUTDIR)
 
-# The style package lives in style/ and is found via an absolute TEXINPUTS
-# path, regardless of which subdirectory the source file sits in.
-TEXENV   := TEXINPUTS="$(CURDIR)/style:.:$$TEXINPUTS"
+TEXENV := TEXINPUTS="$(CURDIR)/style:.:$$TEXINPUTS"
+STYLE := style/thga-db.sty
 
-STYLE    := style/thga-db.sty
-
-# Let make find each .tex by its basename across the source directories.
 vpath %.tex src proposal-template example-documentation
 
-## All documents to build (basename without .tex):
-DOCS     := dbms_10 proposal documentation
+DOCS := dbms_10 proposal documentation
+ALL_PDF := $(addprefix $(OUTDIR)/, $(addsuffix .pdf, $(DOCS)))
 
-ALL_PDF  := $(addprefix $(OUTDIR)/, $(addsuffix .pdf, $(DOCS)))
 
 # ---- Main targets -------------------------------------------
 
-.PHONY: all docs test up down logs clean distclean help
+.PHONY: all docs schema test up down logs \
+        frontend-sync frontend-run frontend-build \
+        deb deb-info clean distclean help
 
-all: $(ALL_PDF)
+all: docs
 
-docs: all
+docs: $(ALL_PDF)
+
+schema:
+	plantuml -tsvg schema.puml
 
 test:
 	$(PYTHON) -m pytest -q
@@ -55,30 +51,92 @@ down:
 logs:
 	docker compose logs -f api postgres
 
+
+# ---- Frontend targets ---------------------------------------
+
+frontend-sync:
+	cd $(FRONTEND_DIR) && uv sync
+
+frontend-run: frontend-sync
+	cd $(FRONTEND_DIR) && uv run python -m fittracker_frontend
+
+frontend-build: frontend-sync
+	cd $(FRONTEND_DIR) && uv run pyinstaller \
+		--name fittracker \
+		--onedir \
+		--windowed \
+		--clean \
+		--noconfirm \
+		--paths src \
+		src/fittracker_frontend/__main__.py
+
+deb: frontend-build
+	rm -rf $(FRONTEND_PKG)
+	mkdir -p $(FRONTEND_PKG)/opt/fittracker
+	mkdir -p $(FRONTEND_PKG)/usr/bin
+	mkdir -p $(FRONTEND_PKG)/usr/share/applications
+	cp -a $(FRONTEND_BUILD)/. $(FRONTEND_PKG)/opt/fittracker/
+	ln -s /opt/fittracker/fittracker $(FRONTEND_PKG)/usr/bin/fittracker
+	cp $(FRONTEND_DIR)/packaging/fittracker.desktop \
+		$(FRONTEND_PKG)/usr/share/applications/fittracker.desktop
+	rm -f $(DEB_FILE)
+	fpm -s dir -t deb \
+		--name fittracker-frontend \
+		--version $(FRONTEND_VERSION) \
+		--architecture $(FRONTEND_ARCH) \
+		--description "Tkinter desktop frontend for the Fit Tracker REST API" \
+		--maintainer "Ahmad Hoteit" \
+		--url "https://github.com/wojak0/fittracker" \
+		--depends libc6 \
+		--depends libx11-6 \
+		--depends libxext6 \
+		--depends libxrender1 \
+		--depends libxft2 \
+		--depends libfontconfig1 \
+		--package $(abspath $(DEB_FILE)) \
+		-C $(FRONTEND_PKG) .
+
+deb-info:
+	dpkg-deb --info $(DEB_FILE)
+
+
+# ---- LaTeX rules --------------------------------------------
+
 $(OUTDIR):
 	mkdir -p $(OUTDIR)
 
-# Generic rule: <basename>.tex (found via vpath) → out/<basename>.pdf
 $(OUTDIR)/%.pdf: %.tex $(STYLE) | $(OUTDIR)
 	$(TEXENV) $(LATEXMK) $(LMKFLAGS) $<
+
 
 # ---- Clean up -----------------------------------------------
 
 clean:
 	rm -f $(addprefix $(OUTDIR)/, *.aux *.log *.fdb_latexmk *.fls *.out *.toc *.synctex.gz)
+	rm -rf $(FRONTEND_DIR)/build $(FRONTEND_PKG)
 
 distclean:
 	rm -rf $(OUTDIR)
+	rm -rf $(FRONTEND_DIR)/build
+	rm -rf $(FRONTEND_DIR)/dist
+	rm -rf $(FRONTEND_PKG)
+
 
 # ---- Help ---------------------------------------------------
 
 help:
 	@echo "Available targets:"
-	@echo "  all        – build all PDFs  (→ $(OUTDIR)/)"
-	@echo "  docs       – build all PDFs  (alias for all)"
-	@echo "  test       – run the automated backend tests"
-	@echo "  up         – build and start PostgreSQL + FastAPI"
-	@echo "  down       – stop the backend containers"
-	@echo "  logs       – follow PostgreSQL + FastAPI logs"
-	@echo "  clean      – remove auxiliary files, keep PDFs"
-	@echo "  distclean  – remove everything including $(OUTDIR)/"
+	@echo "  all             – build all PDF documents"
+	@echo "  docs            – build all PDF documents"
+	@echo "  schema          – render schema.puml as schema.svg"
+	@echo "  test            – run backend tests"
+	@echo "  up              – build and start PostgreSQL + FastAPI"
+	@echo "  down            – stop backend containers"
+	@echo "  logs            – follow backend container logs"
+	@echo "  frontend-sync   – install locked frontend dependencies"
+	@echo "  frontend-run    – run the Tkinter frontend"
+	@echo "  frontend-build  – create the PyInstaller executable"
+	@echo "  deb             – build the Debian installer"
+	@echo "  deb-info        – display Debian package metadata"
+	@echo "  clean           – remove temporary build files"
+	@echo "  distclean       – remove all generated outputs"
