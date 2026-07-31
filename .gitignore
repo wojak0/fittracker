@@ -1,4 +1,4 @@
-# LaTeX-Hilfsdateien und generierte PDFs
+# LaTeX helper files and generated PDFs
 out/
 *.aux
 *.log
@@ -22,5 +22,16 @@ htmlcov/
 # Build and package output
 build/
 dist/
+pkg/
 *.egg-info/
 *.deb
+*.spec
+
+# Generated database diagram
+schema.svg
+
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+*~
+*.swp
