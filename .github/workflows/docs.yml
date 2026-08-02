@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   documentation:
-    name: Build LaTeX PDFs
+    name: Build Fit Tracker documentation
     runs-on: ubuntu-latest
 
     steps:
@@ -31,21 +31,24 @@ jobs:
             texlive-lang-german \
             texlive-latex-extra
 
-      - name: Build all documentation
-        run: make docs
-
-      - name: Validate generated PDFs
+      - name: Build Fit Tracker documentation
         run: |
-          test -s out/dbms_10.pdf
-          test -s out/proposal.pdf
-          test -s out/documentation.pdf
+          make docs
+          cp documentation/proposal.pdf out/Proposal.pdf
+
+      - name: Validate generated documentation
+        run: |
+          test -s out/Proposal.pdf
           test -s out/user-manual.pdf
           test -s out/developer-manual.pdf
 
-      - name: Upload documentation artifact
+      - name: Upload Fit Tracker documentation
         uses: actions/upload-artifact@v6
         with:
-          name: fittracker-documentation-pdfs
-          path: out/*.pdf
+          name: fittracker-submission-documents
+          path: |
+            out/Proposal.pdf
+            out/user-manual.pdf
+            out/developer-manual.pdf
           if-no-files-found: error
           retention-days: 14

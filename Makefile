@@ -20,9 +20,9 @@ LMKFLAGS := -pdf -interaction=nonstopmode -halt-on-error \
 TEXENV := TEXINPUTS="$(CURDIR)/style:.:$$TEXINPUTS"
 STYLE := style/thga-db.sty
 
-vpath %.tex src proposal-template example-documentation documentation
+vpath %.tex documentation
 
-DOCS := dbms_10 proposal documentation user-manual developer-manual
+DOCS := user-manual developer-manual
 ALL_PDF := $(addprefix $(OUTDIR)/, $(addsuffix .pdf, $(DOCS)))
 
 
