@@ -21,7 +21,7 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 app = FastAPI(
     title="Fit Tracker API",
     description="REST API for strength-training sessions.",
-    version="0.1.1",
+    version="0.1.2",
 )
 
 
