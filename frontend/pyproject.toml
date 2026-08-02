@@ -1,6 +1,6 @@
 [project]
 name = "fittracker-frontend"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tkinter desktop frontend for the Fit Tracker REST API"
 requires-python = ">=3.11"
 dependencies = [

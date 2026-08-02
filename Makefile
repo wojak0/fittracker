@@ -8,7 +8,7 @@ OUTDIR := out
 PYTHON := $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 FRONTEND_DIR := frontend
-FRONTEND_VERSION := 0.1.0
+FRONTEND_VERSION := 0.1.1
 FRONTEND_ARCH := amd64
 FRONTEND_BUILD := $(FRONTEND_DIR)/dist/fittracker
 FRONTEND_PKG := $(FRONTEND_DIR)/pkg

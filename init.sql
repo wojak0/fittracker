@@ -55,22 +55,6 @@ CREATE TABLE workout_exercises (
 INSERT INTO users (username, email)
 VALUES ('demo_user', 'demo@fittracker.local');
 
-INSERT INTO exercises (name, target_muscle, description)
-VALUES
-    (
-        'Bench Press',
-        'Chest',
-        'Flat barbell press for chest strength.'
-    ),
-    (
-        'Squat',
-        'Legs',
-        'Barbell back squat for lower-body strength.'
-    ),
-    (
-        'Deadlift',
-        'Back',
-        'Barbell pull for posterior-chain strength.'
     ),
     (
         'Overhead Press',
@@ -82,3 +66,82 @@ VALUES
         'Triceps',
         'Cable pushdown for the triceps.'
     );
+
+INSERT INTO exercises (name, target_muscle, description)
+VALUES
+    (
+        'Bench Press',
+        'Chest',
+        'Flat barbell press for chest strength.'
+    ),
+    (
+        'Incline Dumbbell Press',
+        'Chest',
+        'Incline dumbbell press targeting the upper chest.'
+    ),
+    (
+        'Push-Up',
+        'Chest',
+        'Bodyweight pressing exercise for the chest and triceps.'
+    ),
+    (
+        'Squat',
+        'Legs',
+        'Barbell back squat for lower-body strength.'
+    ),
+    (
+        'Leg Press',
+        'Legs',
+        'Machine-based pressing movement for the lower body.'
+    ),
+    (
+        'Walking Lunge',
+        'Legs',
+        'Alternating lunge movement for leg strength and balance.'
+    ),
+    (
+        'Deadlift',
+        'Back',
+        'Barbell pull for posterior-chain strength.'
+    ),
+    (
+        'Romanian Deadlift',
+        'Hamstrings',
+        'Hip-hinge movement targeting the hamstrings and glutes.'
+    ),
+    (
+        'Barbell Row',
+        'Back',
+        'Bent-over barbell pulling exercise for the upper back.'
+    ),
+    (
+        'Lat Pulldown',
+        'Back',
+        'Cable pulling exercise targeting the latissimus muscles.'
+    ),
+    (
+        'Overhead Press',
+        'Shoulders',
+        'Standing barbell shoulder press.'
+    ),
+    (
+        'Lateral Raise',
+        'Shoulders',
+        'Dumbbell raise targeting the lateral shoulder muscles.'
+    ),
+    (
+        'Biceps Curl',
+        'Biceps',
+        'Curling movement for isolated biceps training.'
+    ),
+    (
+        'Triceps Pushdown',
+        'Triceps',
+        'Cable pushdown for the triceps.'
+    ),
+    (
+        'Standing Calf Raise',
+        'Calves',
+        'Standing exercise for strengthening the calf muscles.'
+    )
+ON CONFLICT (name) DO NOTHING;
