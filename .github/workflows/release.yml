@@ -1,4 +1,4 @@
-name: Build Debian Release
+name: Build Fit Tracker Release
 
 on:
   workflow_dispatch:
@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  build-debian-package:
-    name: Build Debian package
+  build-release:
+    name: Build release artifacts
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install build tools
+      - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -35,26 +35,44 @@ jobs:
             libxext6 \
             libxrender1 \
             libxft2 \
-            libfontconfig1
+            libfontconfig1 \
+            latexmk \
+            lmodern \
+            texlive-fonts-recommended \
+            texlive-lang-german \
+            texlive-latex-extra
           python -m pip install --upgrade pip uv
           sudo gem install fpm --no-document
 
       - name: Build Debian installer
         run: make deb
 
-      - name: Validate Debian installer
+      - name: Build Fit Tracker documentation
+        run: |
+          make docs
+          cp documentation/proposal.pdf out/Proposal.pdf
+
+      - name: Validate release artifacts
         run: |
           DEB_FILE="$(find frontend/dist -maxdepth 1 -name '*.deb' -print -quit)"
           test -n "$DEB_FILE"
           dpkg-deb --info "$DEB_FILE"
           dpkg-deb --contents "$DEB_FILE"
+          test -s out/Proposal.pdf
+          test -s out/user-manual.pdf
+          test -s out/developer-manual.pdf
 
-      - name: Upload Debian artifact
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
-          name: fittracker-debian-package
-          path: frontend/dist/*.deb
+          name: fittracker-release-artifacts
+          path: |
+            frontend/dist/*.deb
+            out/Proposal.pdf
+            out/user-manual.pdf
+            out/developer-manual.pdf
           if-no-files-found: error
+          retention-days: 14
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -62,6 +80,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DEB_FILE="$(find frontend/dist -maxdepth 1 -name '*.deb' -print -quit)"
-          gh release create "${GITHUB_REF_NAME}" "$DEB_FILE" \
+          gh release create "${GITHUB_REF_NAME}" \
+            "$DEB_FILE" \
+            out/Proposal.pdf \
+            out/user-manual.pdf \
+            out/developer-manual.pdf \
             --title "Fit Tracker ${GITHUB_REF_NAME}" \
             --generate-notes
