@@ -1,0 +1,657 @@
+% ============================================================
+% Fit Tracker - User Manual
+% DBMS term project, THGA Bochum
+% ============================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{float}
+\PassOptionsToPackage{english}{babel}
+\usepackage{thga-db}
+\setlength{\headheight}{22pt}
+
+\renewcommand{\thgaKurs}{Fit Tracker - User Manual}
+\renewcommand{\thgaDatum}{Version 0.1.2}
+\addto\captionsenglish{%
+  \renewcommand{\contentsname}{Contents}%
+  \renewcommand{\figurename}{Figure}%
+  \renewcommand{\tablename}{Table}%
+}
+
+\graphicspath{{images/user/}}
+
+% The title macro supplied with the course style places long titles on the
+% red separator. This local variant keeps the same THGA design while placing
+% the title safely inside the blue banner.
+\newcommand{\fitTrackerTitle}[2]{%
+  \begin{tikzpicture}[remember picture, overlay]
+    \fill[THGABlau] (current page.north west)
+      rectangle ([yshift=-3.2cm]current page.north east);
+    \fill[THGARot] ([yshift=-3.2cm]current page.north west)
+      rectangle ([yshift=-3.6cm]current page.north east);
+    \node[
+      anchor=west,
+      text=white,
+      font=\fontsize{22}{26}\selectfont\bfseries
+    ] at ([xshift=2.5cm,yshift=-1.75cm]current page.north west) {#1};
+  \end{tikzpicture}%
+  \par\vspace*{0.9cm}
+  {\color{THGABlauDark1}\fontsize{13}{16}\selectfont #2}\par
+  \vspace{0.8cm}
+  {\color{THGAGrau}\small
+    Lecturer: \thgaDozent \quad
+    \href{mailto:\thgaEmail}{\thgaEmail}
+    \quad THGA Bochum}
+  \par\vspace{0.4cm}
+  \textcolor{THGARot}{\rule{\linewidth}{1.5pt}}
+  \vspace{0.5cm}
+}
+
+\begin{document}
+\selectlanguage{english}
+\thispagestyle{empty}
+\fitTrackerTitle{Fit Tracker - User Manual}%
+{Installation, daily operation and troubleshooting - Version 0.1.2}
+
+\begin{infobox}
+\textbf{Author:} Ahmad Hoteit \\
+\textbf{Module:} Introduction to Database Management Systems \\
+\textbf{Lecturer:} Stephan B\"okelmann \\
+\textbf{Institution:} Technische Hochschule Georg Agricola (THGA), Bochum \\
+\textbf{System:} PostgreSQL, FastAPI, Docker Compose and Tkinter \\
+\textbf{Repository:} \url{https://github.com/wojak0/fittracker}
+\end{infobox}
+
+\vfill
+\begin{beispielbox}
+\textbf{Purpose of this manual.} This document contains every step needed to
+install, start, test and operate Fit Tracker on a Debian or Ubuntu desktop.
+No programming knowledge is required. Commands can be copied exactly unless a
+placeholder is explicitly marked for replacement.
+\end{beispielbox}
+
+\newpage
+\tableofcontents
+\newpage
+
+% ============================================================
+\section{About Fit Tracker}
+% ============================================================
+
+Fit Tracker is a self-hosted desktop application for recording
+strength-training sessions. A user can browse an exercise dictionary, create a
+workout with one or more exercises and review the resulting workout history.
+The application calculates training volume automatically as
+
+\[
+  \text{volume} = \text{sets} \times \text{repetitions} \times
+  \text{weight in kg}.
+\]
+
+The system consists of three separate components:
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item a PostgreSQL database running in a Docker container;
+  \item a FastAPI backend running in a second Docker container; and
+  \item a native Tkinter desktop frontend installed from a Debian package.
+\end{enumerate}
+
+The frontend never connects directly to PostgreSQL. It sends HTTP requests to
+FastAPI, and FastAPI reads from or writes to the database. Write requests are
+protected by an \texttt{X-API-Key}.
+
+\begin{warnbox}
+\textbf{Important.} The Debian package contains only the desktop frontend.
+PostgreSQL and FastAPI must be running before the frontend can connect. The
+frontend and backend may run on the same computer; in that case the API URL is
+\texttt{http://localhost:8888}.
+\end{warnbox}
+
+% ============================================================
+\section{System requirements}
+% ============================================================
+
+\begin{tabularx}{\linewidth}{@{}p{4.1cm}X@{}}
+\toprule
+\textbf{Requirement} & \textbf{Expected configuration} \\
+\midrule
+Operating system & Debian or Ubuntu desktop on \texttt{amd64}/\texttt{x86\_64} \\
+Container runtime & Docker Engine with Docker Compose v2 \\
+Desktop access & A graphical session for the Tkinter frontend \\
+Permissions & Permission to run Docker and install a local \texttt{.deb} file \\
+Network & Required for the first Docker build and package download \\
+Default ports & Host port \texttt{8888}; PostgreSQL is not exposed to the host \\
+Disk space & At least 1 GB free for images, containers and persistent data \\
+\bottomrule
+\end{tabularx}
+
+Verify the required command-line tools:
+
+\begin{lstlisting}[caption={Checking Docker, Compose and Git}]
+docker --version
+docker compose version
+git --version
+\end{lstlisting}
+
+All three commands must print a version. If Docker is not installed, install
+Docker Engine and the Compose plugin according to the operating system's
+administration policy before continuing.
+
+% ============================================================
+\section{Obtain the project files}
+% ============================================================
+
+Use either a supplied project archive or the Git repository.
+
+\subsection{From a supplied archive}
+
+Extract the archive, open a terminal and change into the extracted repository
+root. The correct directory contains \texttt{docker-compose.yml},
+\texttt{Dockerfile}, \texttt{init.sql} and \texttt{Makefile}.
+
+\subsection{From GitHub}
+
+Repository access is required because the project may be private.
+
+\begin{lstlisting}[caption={Cloning the repository}]
+git clone https://github.com/wojak0/fittracker.git
+cd fittracker
+\end{lstlisting}
+
+Confirm that the terminal is in the correct directory:
+
+\begin{lstlisting}[caption={Checking the repository root}]
+ls docker-compose.yml Dockerfile init.sql Makefile
+\end{lstlisting}
+
+% ============================================================
+\section{First-time backend setup}
+% ============================================================
+
+\subsection{Create the environment file}
+
+The backend reads database credentials, the API key and the host port from a
+local \texttt{.env} file. Create it from the safe template:
+
+\begin{lstlisting}[caption={Creating the private environment file}]
+cp .env.example .env
+nano .env
+\end{lstlisting}
+
+Replace both placeholders. The password used in \texttt{POSTGRES\_PASSWORD}
+must also appear in the password part of \texttt{DATABASE\_URL}.
+
+\begin{lstlisting}[caption={Structure of .env - use private values}]
+POSTGRES_USER=fittracker
+POSTGRES_PASSWORD=CHOOSE_A_STRONG_PASSWORD
+POSTGRES_DB=fittracker
+DATABASE_URL=postgresql+psycopg2://fittracker:CHOOSE_A_STRONG_PASSWORD@postgres:5432/fittracker
+API_KEY=CHOOSE_A_LONG_RANDOM_API_KEY
+API_PORT=8888
+\end{lstlisting}
+
+In Nano, save with \texttt{Ctrl+O}, press \texttt{Enter}, then exit with
+\texttt{Ctrl+X}.
+
+\begin{warnbox}
+\textbf{Keep secrets private.} Do not upload \texttt{.env}, paste its values
+into screenshots or commit it to Git. The file is intentionally excluded by
+\texttt{.gitignore}. The API key is not the PostgreSQL password; they serve
+different purposes.
+\end{warnbox}
+
+\subsection{Build and start the services}
+
+From the repository root, run:
+
+\begin{lstlisting}[caption={Starting PostgreSQL and FastAPI}]
+docker compose up -d --build
+\end{lstlisting}
+
+The first run downloads the PostgreSQL and Python base images, builds the API
+image, creates the persistent database volume and executes \texttt{init.sql}.
+Later starts are normally faster.
+
+\subsection{Verify container health}
+
+\begin{lstlisting}[caption={Checking the running services}]
+docker compose ps
+\end{lstlisting}
+
+The output must show both \texttt{api} and \texttt{postgres}. PostgreSQL should
+report \texttt{healthy}; the API should report \texttt{Up}. The API is then
+available on host port \texttt{8888}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.82\linewidth]{../developer/03-docker-services.png}
+  \caption{Expected Docker service status.}
+  \label{fig:docker-status-user}
+\end{figure}
+
+\subsection{Verify the API}
+
+Open the interactive API documentation in a browser:
+
+\begin{center}
+\url{http://localhost:8888/docs}
+\end{center}
+
+Alternatively, test the public exercise endpoint:
+
+\begin{lstlisting}[caption={Checking the API from a terminal}]
+curl http://localhost:8888/exercises
+\end{lstlisting}
+
+A successful response is a JSON list containing 15 exercises. Opening only
+\url{http://localhost:8888} returns \texttt{"detail":"Not Found"}; this is
+expected because the API intentionally has no route at \texttt{/}.
+
+\subsection{Initial database content}
+
+A newly initialized database contains:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item one demo user with \texttt{user\_id = 1};
+  \item 15 seeded exercises; and
+  \item no workout history.
+\end{itemize}
+
+PostgreSQL runs \texttt{init.sql} only when it creates a new database volume.
+Normal restarts preserve all existing workout data.
+
+% ============================================================
+\section{Install the desktop frontend}
+% ============================================================
+
+\subsection{Download the Debian package}
+
+Open the latest project release and download the \texttt{amd64.deb} asset:
+
+\begin{center}
+\url{https://github.com/wojak0/fittracker/releases/latest}
+\end{center}
+
+For version 0.1.2 the filename is:
+
+\begin{center}
+\texttt{fittracker-frontend\_0.1.2\_amd64.deb}
+\end{center}
+
+\subsection{Install the package}
+
+Assuming the browser saved the file in \texttt{Downloads}, run:
+
+\begin{lstlisting}[caption={Installing the Fit Tracker frontend}]
+cd ~/Downloads
+sudo apt install ./fittracker-frontend_0.1.2_amd64.deb
+\end{lstlisting}
+
+Using \texttt{apt install} rather than \texttt{dpkg -i} allows APT to resolve
+declared runtime dependencies.
+
+Verify the installation:
+
+\begin{lstlisting}[caption={Checking the installed package}]
+dpkg -s fittracker-frontend | grep -E '^(Status|Version|Architecture):'
+\end{lstlisting}
+
+The expected status is \texttt{install ok installed}, architecture
+\texttt{amd64} and version \texttt{0.1.2}.
+
+% ============================================================
+\section{Launch and connect}
+% ============================================================
+
+Start Fit Tracker from the desktop application menu, or run:
+
+\begin{lstlisting}[caption={Launching the installed application}]
+fittracker
+\end{lstlisting}
+
+The connection dialog shown in Figure~\ref{fig:connection} opens.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[
+    width=0.66\linewidth,
+    trim=3pt 3pt 0pt 0pt,
+    clip
+  ]{01-connection-dialog.png}
+  \caption{Connection dialog shown when Fit Tracker starts.}
+  \label{fig:connection}
+\end{figure}
+
+Enter the following values:
+
+\begin{tabularx}{\linewidth}{@{}p{3.8cm}X@{}}
+\toprule
+\textbf{Field} & \textbf{Value} \\
+\midrule
+API URL & \texttt{http://localhost:8888} when backend and frontend run locally \\
+X-API-Key & The exact value of \texttt{API\_KEY} from the backend's \texttt{.env} file \\
+\bottomrule
+\end{tabularx}
+
+Click \textbf{Connect}. The key is masked while typing, retained only for the
+current application session and never written to disk by the frontend.
+
+\begin{infobox}
+\textbf{Remote backend.} If FastAPI runs on another machine, replace
+\texttt{localhost} with that machine's reachable hostname or IP address and
+ensure port 8888 is allowed by the network policy. Do not expose the service to
+an untrusted network without additional transport and access protection.
+\end{infobox}
+
+The \textbf{Disconnect} button returns to the connection dialog. It does not
+stop Docker or delete any data.
+
+% ============================================================
+\section{Use the application}
+% ============================================================
+
+The main window contains a \textbf{User ID} field and three tabs:
+\textbf{Workout History}, \textbf{Log Workout} and
+\textbf{Exercise Dictionary}. Version 0.1.2 provides the seeded demo user, so
+leave the User ID set to \texttt{1}.
+
+\subsection{Review an empty workout history}
+
+A new database has no workout sessions. The history tab therefore looks like
+Figure~\ref{fig:empty-history}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.97\linewidth]{02-empty-workout-history.png}
+  \caption{Workout History immediately after a fresh installation.}
+  \label{fig:empty-history}
+\end{figure}
+
+Click \textbf{Refresh} at any time to request the current history for the User
+ID shown at the top of the window.
+
+\subsection{Browse the exercise dictionary}
+
+Open \textbf{Exercise Dictionary}. The table lists ID, exercise name, target
+muscle and description. Click \textbf{Refresh} to load the newest values from
+the backend.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.97\linewidth]{03-exercise-dictionary.png}
+  \caption{The 15 seeded exercises in version 0.1.2.}
+  \label{fig:dictionary}
+\end{figure}
+
+\subsection{Log a workout}
+
+Open \textbf{Log Workout} and complete the following procedure:
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item Enter a date in ISO format \texttt{YYYY-MM-DD}.
+  \item Optionally enter a short note.
+  \item Select an exercise.
+  \item Enter sets, repetitions and weight in kilograms.
+  \item Click \textbf{Add Exercise to Session}.
+  \item Repeat steps 3--5 to add more exercises.
+  \item Review the pending table, then click \textbf{Save Workout}.
+\end{enumerate}
+
+Figure~\ref{fig:workout-form} uses this reproducible example:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item Bench Press: 3 sets, 8 repetitions, 60.00 kg;
+  \item Overhead Press: 3 sets, 10 repetitions, 30.00 kg; and
+  \item note: \texttt{Upper body strength session}.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.97\linewidth]{04-completed-workout-form.png}
+  \caption{A workout containing two exercises before it is saved.}
+  \label{fig:workout-form}
+\end{figure}
+
+Select a row and click \textbf{Remove Selected} to remove a pending exercise
+before saving. The same exercise cannot be added twice to one workout.
+
+The frontend validates the input before sending it:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item sets must be between 1 and 100;
+  \item repetitions must be between 1 and 1000;
+  \item weight must be between 0 and 9999.99 kg with at most two decimals;
+  \item the date must use a valid \texttt{YYYY-MM-DD} value; and
+  \item at least one exercise is required.
+\end{itemize}
+
+After a successful write, the confirmation in Figure~\ref{fig:saved-dialog}
+appears.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.94\linewidth]{05-workout-saved-confirmation.png}
+  \caption{Confirmation after the workout and its exercise entries are saved.}
+  \label{fig:saved-dialog}
+\end{figure}
+
+\subsection{Read the saved history and volume}
+
+After confirmation, Fit Tracker loads the history and selects the Workout
+History tab. The sample workout has total volume
+
+\[
+ (3 \times 8 \times 60) + (3 \times 10 \times 30)
+ = 1440 + 900 = 2340\text{ kg}.
+\]
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.97\linewidth]{06-saved-workout-history.png}
+  \caption{The saved workout with both exercises and total volume.}
+  \label{fig:saved-history}
+\end{figure}
+
+% ============================================================
+\section{Daily operation and persistent data}
+% ============================================================
+
+\subsection{Start after a reboot}
+
+The Debian frontend remains installed, but the Docker services must be running.
+From the repository root, run:
+
+\begin{lstlisting}[caption={Normal startup after a reboot}]
+docker compose up -d
+docker compose ps
+fittracker
+\end{lstlisting}
+
+There is no need to rebuild every day. Use \texttt{--build} after backend code
+or dependency changes.
+
+\subsection{Stop the system safely}
+
+Close the frontend window, then stop the backend containers from the repository
+root:
+
+\begin{lstlisting}[caption={Stopping the backend while preserving data}]
+docker compose down
+\end{lstlisting}
+
+The named Docker volume preserves users, exercises and workouts. Starting the
+services again reconnects PostgreSQL to the same volume.
+
+\begin{warnbox}
+\textbf{Do not add \texttt{-v} during normal shutdown.}
+\texttt{docker compose down -v} permanently deletes the project's database
+volume and all recorded workouts. Use it only when an intentional full reset is
+required.
+\end{warnbox}
+
+\subsection{Inspect logs}
+
+If a service behaves unexpectedly, inspect its recent output:
+
+\begin{lstlisting}[caption={Following backend logs}]
+docker compose logs -f api postgres
+\end{lstlisting}
+
+Press \texttt{Ctrl+C} to stop following logs; the containers continue running.
+
+% ============================================================
+\section{Update or reinstall the frontend}
+% ============================================================
+
+Download the newer \texttt{.deb} from the Releases page, then install it over
+the existing version:
+
+\begin{lstlisting}[caption={Installing a newer frontend release}]
+cd ~/Downloads
+sudo apt install ./fittracker-frontend_VERSION_amd64.deb
+\end{lstlisting}
+
+Replace \texttt{VERSION} with the downloaded release version. Existing workout
+data is stored by PostgreSQL and is unaffected by reinstalling the frontend.
+
+If backend source files changed, update the repository and rebuild:
+
+\begin{lstlisting}[caption={Updating the backend from Git}]
+cd /path/to/fittracker
+git pull --ff-only
+docker compose up -d --build
+\end{lstlisting}
+
+% ============================================================
+\section{Troubleshooting}
+% ============================================================
+
+\subsection{The browser shows Not Found at localhost:8888}
+
+This is expected at the API root. Open
+\url{http://localhost:8888/docs} or
+\url{http://localhost:8888/exercises} instead.
+
+\subsection{PostgreSQL is unhealthy or requests fail}
+
+Run:
+
+\begin{lstlisting}
+docker compose ps
+docker compose logs postgres
+docker compose logs api
+\end{lstlisting}
+
+Verify that \texttt{.env} exists, all values are non-empty, and the password in
+\texttt{DATABASE\_URL} exactly matches \texttt{POSTGRES\_PASSWORD}.
+
+\subsection{Database is uninitialized and no password is specified}
+
+This message means Compose did not receive a non-empty
+\texttt{POSTGRES\_PASSWORD}. Return to Section 4.1, create \texttt{.env} and
+restart with \texttt{docker compose up -d --build}.
+
+\subsection{The frontend reports HTTP 401}
+
+The entered key does not match \texttt{API\_KEY} in the backend's
+\texttt{.env}. Click \textbf{Disconnect}, re-enter the exact key and connect
+again. After changing \texttt{.env}, recreate the API container:
+
+\begin{lstlisting}
+docker compose up -d --force-recreate api
+\end{lstlisting}
+
+\subsection{The frontend cannot connect}
+
+Confirm that the URL begins with \texttt{http://} or \texttt{https://}, that
+the API container is running and that the port matches \texttt{API\_PORT}.
+For the default local configuration, use \texttt{http://localhost:8888}.
+
+\subsection{Port 8888 is already in use}
+
+Choose an unused port in \texttt{.env}, for example
+\texttt{API\_PORT=8890}, then recreate the API container. Connect the frontend
+to \texttt{http://localhost:8890}.
+
+\subsection{User not found}
+
+The supplied database initializes demo user \texttt{1}. Ensure the User ID
+field contains \texttt{1}. User registration is not part of version 0.1.2.
+
+\subsection{Only five exercises appear after an upgrade}
+
+An older Docker volume may have been initialized by version 0.1.0. The init
+script is not rerun automatically on existing data. If the volume contains no
+valuable workouts, an administrator may intentionally reset it:
+
+\begin{lstlisting}[caption={Destructive reset - deletes all workout data}]
+docker compose down -v
+docker compose up -d --build
+\end{lstlisting}
+
+Do not run this reset when existing workouts must be preserved.
+
+% ============================================================
+\section{Uninstall and intentional reset}
+% ============================================================
+
+Remove only the desktop frontend:
+
+\begin{lstlisting}[caption={Uninstalling the Debian frontend}]
+sudo apt remove fittracker-frontend
+\end{lstlisting}
+
+This does not remove Docker containers or PostgreSQL data. Stop the backend
+while preserving its volume with \texttt{docker compose down}.
+
+To remove the backend containers \emph{and} permanently erase the database,
+run \texttt{docker compose down -v} only after confirming that the data is no
+longer needed.
+
+% ============================================================
+\section{Acceptance checklist}
+% ============================================================
+
+The following checklist provides a complete functional test:
+
+\begin{enumerate}[leftmargin=1.6em]
+  \item \texttt{docker compose ps} shows API up and PostgreSQL healthy.
+  \item \url{http://localhost:8888/docs} opens the FastAPI documentation.
+  \item \texttt{/exercises} returns 15 exercises.
+  \item \texttt{dpkg -s fittracker-frontend} reports an installed package.
+  \item The frontend connects with the configured URL and API key.
+  \item User ID 1 initially has an empty history in a fresh database.
+  \item The Exercise Dictionary displays all 15 exercises.
+  \item A workout containing two exercises can be saved.
+  \item The history shows both exercises and the correct total volume.
+  \item After \texttt{docker compose down} followed by
+        \texttt{docker compose up -d}, the saved workout is still present.
+  \item A write request with a missing or incorrect API key returns HTTP 401.
+\end{enumerate}
+
+% ============================================================
+\section{Current scope and limitations}
+% ============================================================
+
+Version 0.1.2 intentionally implements the approved term-project scope:
+
+\begin{itemize}[leftmargin=1.4em]
+  \item one seeded demo user with User ID 1;
+  \item reading exercises and workout history;
+  \item creating workouts and their exercise entries;
+  \item no edit or delete function in the desktop frontend;
+  \item no user-registration screen; and
+  \item no standalone mobile application.
+\end{itemize}
+
+These limitations do not prevent the documented core workflow. Possible future
+extensions include user management, deleting workouts and a mobile client that
+connects to a securely hosted backend.
+
+\section*{Support information}
+\addcontentsline{toc}{section}{Support information}
+
+When reporting a problem, include the application version, operating system,
+the output of \texttt{docker compose ps} and the relevant container logs. Never
+include the real API key or database password.
+
+\end{document}
