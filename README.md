@@ -1,49 +1,71 @@
-# Fit Tracker – DBMS Term Project
+# 🏋️ Fit Tracker - DBMS Term Project
+
+[![Fit Tracker CI](https://github.com/wojak0/fittracker/actions/workflows/ci.yml/badge.svg)](https://github.com/wojak0/fittracker/actions/workflows/ci.yml)
+[![Documentation](https://github.com/wojak0/fittracker/actions/workflows/docs.yml/badge.svg)](https://github.com/wojak0/fittracker/actions/workflows/docs.yml)
+[![Release Build](https://github.com/wojak0/fittracker/actions/workflows/release.yml/badge.svg)](https://github.com/wojak0/fittracker/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **Author:** Ahmad Hoteit  
 **Module:** Introduction to Database Management Systems  
 **Lecturer:** Stephan Bökelmann  
 **Institution:** Technische Hochschule Georg Agricola (THGA), Bochum  
 **Semester:** Summer Term 2026  
+**Current version:** 0.1.2
 
-Fit Tracker is a database-backed strength-training application developed as the
-term project for the Introduction to Database Management Systems module.
+Fit Tracker is a self-hosted strength-training tracker built with PostgreSQL,
+FastAPI and a Tkinter desktop client. It records workout sessions, exercises,
+sets, repetitions and weight, and calculates the total training volume of every
+session.
 
-It allows gym users to create workout sessions, select exercises from an
-exercise dictionary, record sets, repetitions and weight, and review their
-training history.
+The backend runs through Docker Compose. The desktop frontend is distributed as
+an installable Debian package and communicates with the backend through a REST
+API. Write operations are protected by an `X-API-Key`.
 
-## Architecture
+![Fit Tracker workout history](documentation/images/user/06-saved-workout-history.png)
 
-```text
-Tkinter frontend installed as .deb
-              |
-              | HTTP + X-API-Key
-              v
-       FastAPI container
-              |
-              v
-      PostgreSQL container
+## ✨ Features
+
+- PostgreSQL database with four normalized relational tables
+- FastAPI backend with two read and two protected write endpoints
+- `X-API-Key` authentication for write operations
+- Joined workout history with automatic volume aggregation
+- Fifteen seeded exercises covering the main muscle groups
+- Tkinter desktop frontend for browsing and recording workouts
+- Docker Compose deployment with a persistent PostgreSQL volume
+- Installable AMD64 Debian package (`.deb`)
+- Automated backend, frontend and Docker integration tests
+- GitHub Actions for CI, LaTeX documentation and release artifacts
+- User Manual and Developer Manual written in LaTeX
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    A["Tkinter desktop client<br/>installed from .deb"]
+    B["FastAPI<br/>Docker container"]
+    C["PostgreSQL<br/>Docker container"]
+    A -->|"HTTP; X-API-Key on writes"| B
+    B -->|"SQLAlchemy"| C
 ```
 
-Docker Compose operates only the backend services:
+Docker Compose operates the two backend services:
 
 - `postgres`: PostgreSQL database
 - `api`: FastAPI REST API
 
-The planned Tkinter frontend runs outside Docker and communicates exclusively
-with the FastAPI backend.
+The Tkinter frontend runs on the host system and communicates only with the API.
+It never connects directly to PostgreSQL.
 
-## Database model
+## 🗄️ Database model
 
-The system contains exactly four relational tables:
+The application uses exactly four relational tables:
 
 | Table | Purpose |
 | --- | --- |
 | `users` | Stores application users |
 | `exercises` | Stores the exercise dictionary |
 | `workouts` | Stores workout sessions belonging to users |
-| `workout_exercises` | Resolves the N:M relationship between workouts and exercises |
+| `workout_exercises` | Resolves the N:M relationship and stores sets, repetitions and weight |
 
 Relationship structure:
 
@@ -51,60 +73,93 @@ Relationship structure:
 users 1 ── N workouts 1 ── N workout_exercises N ── 1 exercises
 ```
 
-The schema includes primary keys, foreign keys, unique constraints, `NOT NULL`
-constraints and checks for positive sets and repetitions and non-negative
-weights.
+The schema enforces primary keys, foreign keys, unique values, required values,
+positive sets and repetitions, non-negative weights, and one entry per exercise
+within a workout.
 
-## REST API
+![Relational database schema](documentation/images/developer/01-database-schema.png)
 
-The API provides exactly two read and two write endpoints:
+## 🔌 REST API
 
 | Method | Endpoint | API key | Purpose |
 | --- | --- | --- | --- |
-| `GET` | `/exercises` | No | Read the exercise dictionary |
-| `GET` | `/users/{user_id}/workouts` | No | Read joined workout history and total volume |
+| `GET` | `/exercises` | No | Return the exercise dictionary |
+| `GET` | `/users/{user_id}/workouts` | No | Return joined workout history and total volume |
 | `POST` | `/workouts` | Yes | Create a workout session |
-| `POST` | `/workouts/{workout_id}/exercises` | Yes | Log sets, repetitions and weight |
+| `POST` | `/workouts/{workout_id}/exercises` | Yes | Add exercise performance to a workout |
 
-The workout-history endpoint performs JOIN and aggregation operations. Training
-volume is calculated as:
-
-```text
-sets × repetitions × weight
-```
-
-Write requests require the following HTTP header:
+Write requests require this HTTP header:
 
 ```text
 X-API-Key: configured-api-key
 ```
 
-## Requirements
+Training volume is calculated in PostgreSQL as:
 
-- Linux or Debian-based system
-- Docker
-- Docker Compose
+```text
+sets × repetitions × weight_kg
+```
+
+Interactive API documentation is available while the backend is running:
+
+```text
+http://localhost:8888/docs
+```
+
+## ✅ Requirements
+
+### 🐳 Backend host
+
+- Linux or another Docker-compatible system
+- Docker Engine
+- Docker Compose plugin
 - Git
-- Python 3.11 or newer for local testing
 
-## Starting the backend
+### 🖥️ Desktop frontend
 
-Copy the environment template:
+- Debian or Ubuntu on AMD64/x86-64
+- A graphical desktop environment
+- Access to the running FastAPI backend
+
+### 🔧 Development tools
+
+- Python 3.11 or newer
+- `uv` for the frontend environment
+- `pytest`
+- PlantUML for regenerating the schema diagram
+- LaTeX (`latexmk` and the required TeX Live packages) for the manuals
+- Ruby `fpm` and PyInstaller for building the Debian package
+
+## 🚀 Starting the backend
+
+Clone the repository and enter it:
+
+```bash
+git clone https://github.com/wojak0/fittracker.git
+cd fittracker
+```
+
+Create the local environment file:
 
 ```bash
 cp .env.example .env
-```
-
-Open `.env` and replace the placeholder password and API key:
-
-```bash
 nano .env
 ```
 
-Build and start PostgreSQL and FastAPI:
+Replace the example PostgreSQL password and API key with private values. The
+username, password and database name in `DATABASE_URL` must match the configured
+PostgreSQL values.
+
+Build and start the backend:
 
 ```bash
 docker compose up -d --build
+```
+
+Or use the Makefile shortcut:
+
+```bash
+make up
 ```
 
 Check the services:
@@ -113,177 +168,266 @@ Check the services:
 docker compose ps
 ```
 
-Both services should be running, and PostgreSQL should report `healthy`.
+The API should report `Up`, and PostgreSQL should report `healthy`.
 
-The interactive FastAPI documentation is available at:
+## 🖥️ Installing and using the desktop frontend
 
-```text
-http://localhost:8888/docs
+Download `fittracker-frontend_0.1.2_amd64.deb` from the latest GitHub Release,
+then install it with APT:
+
+```bash
+sudo apt install ./fittracker-frontend_0.1.2_amd64.deb
 ```
 
-## Initial data
+Start the application from the desktop application menu or from a terminal:
 
-When PostgreSQL creates a new database volume, `init.sql` creates the schema and
-inserts:
+```bash
+fittracker
+```
 
-- Demo user with `user_id = 1`
+In the connection dialog, enter:
+
+- **API URL:** `http://localhost:8888`
+- **X-API-Key:** the value configured as `API_KEY` in `.env`
+
+After connecting, the application provides:
+
+- **Workout History:** review sessions, exercises and total volume
+- **Log Workout:** create a session containing one or more exercises
+- **Exercise Dictionary:** browse the fifteen seeded exercises
+
+The default demonstration account uses `user_id = 1`.
+
+To uninstall the desktop client:
+
+```bash
+sudo apt remove fittracker-frontend
+```
+
+## 🌱 Initial data
+
+On first database initialization, `init.sql` creates the schema and inserts:
+
+- One demonstration user with `user_id = 1`
 - Bench Press
+- Incline Dumbbell Press
+- Push-Up
 - Squat
+- Leg Press
+- Walking Lunge
 - Deadlift
+- Romanian Deadlift
+- Barbell Row
+- Lat Pulldown
 - Overhead Press
+- Lateral Raise
+- Biceps Curl
 - Triceps Pushdown
+- Standing Calf Raise
 
-PostgreSQL executes `init.sql` only when the database volume is initialized for
-the first time.
+PostgreSQL runs `init.sql` only when it creates a new database volume.
 
-## Example API usage
+## 💾 Data persistence
 
-Create a workout:
-
-```bash
-curl -X POST http://localhost:8888/workouts \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "user_id": 1,
-    "workout_date": "2026-07-31",
-    "notes": "Chest session"
-  }'
-```
-
-Log an exercise:
-
-```bash
-curl -X POST http://localhost:8888/workouts/1/exercises \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -d '{
-    "exercise_id": 1,
-    "sets": 3,
-    "reps": 8,
-    "weight_kg": 75
-  }'
-```
-
-Read workout history:
-
-```bash
-curl http://localhost:8888/users/1/workouts
-```
-
-For three sets of eight repetitions with 75 kg, the returned total volume is:
+Workout data is stored in the Docker named volume:
 
 ```text
-3 × 8 × 75 kg = 1800 kg
+fittracker_postgres_data
 ```
 
-## Automated tests
+The data remains available after stopping containers or restarting the computer.
+After a reboot, return to the repository and start the backend again:
 
-Create a Python environment and install the development dependencies:
+```bash
+make up
+```
+
+Stop the containers without deleting data:
+
+```bash
+make down
+```
+
+The `.deb` package contains only the desktop frontend. It does not contain the
+database, and the application needs access to a running backend.
+
+> **Warning:** `docker compose down -v` permanently deletes the project database
+> volume and all saved workouts. Use it only when an intentional clean reset is
+> required.
+
+## 🧪 Automated tests
+
+Create the backend development environment:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 ```
 
-Run the tests:
+Synchronize the locked frontend environment:
 
 ```bash
-.venv/bin/pytest -q
+cd frontend
+uv sync --frozen
+cd ..
 ```
 
-Alternatively:
+Run all backend and frontend tests:
 
 ```bash
 make test
 ```
 
-The current test suite covers:
+The current test suites contain:
 
-- Exercise dictionary retrieval
-- Workout creation
-- Exercise logging
-- Joined workout history
-- Volume aggregation
-- Missing API-key rejection
-- Invalid weight validation
-- Duplicate exercise rejection
-- Foreign-key constraints
-- Database check constraints
+- 8 backend/API and database tests
+- 6 frontend API-client tests
+- A GitHub Actions Docker integration test against real PostgreSQL and FastAPI containers
 
-## Useful commands
+GitHub Actions automatically runs these checks on pushes and pull requests to
+`main`.
+
+## 📦 Building the Debian package
+
+Build the Tkinter executable and Debian installer:
 
 ```bash
-make up       # Build and start the backend
-make down     # Stop the backend
-make logs     # Display API and PostgreSQL logs
-make test     # Run automated tests
-make docs     # Build the LaTeX documents
+make deb
 ```
 
-## Repository structure
+The generated installer is written to:
+
+```text
+frontend/dist/fittracker-frontend_0.1.2_amd64.deb
+```
+
+Inspect its package metadata:
+
+```bash
+make deb-info
+```
+
+The package declares the MIT license, AMD64 architecture, maintainer, homepage
+and required Linux libraries.
+
+## 📚 Documentation
+
+The project provides three final documents:
+
+- [Approved Fit Tracker proposal](documentation/proposal.pdf)
+- [User Manual source](documentation/user-manual.tex)
+- [Developer Manual source](documentation/developer-manual.tex)
+
+Build both LaTeX manuals locally:
+
+```bash
+make docs
+```
+
+Generated PDFs are written to `out/`:
+
+```text
+out/user-manual.pdf
+out/developer-manual.pdf
+```
+
+The **Documentation PDF Build** workflow builds and uploads a downloadable
+artifact containing the approved proposal and both manuals. Tagged releases also
+attach all three documents next to the Debian installer.
+
+## 🛠️ Useful Makefile commands
+
+| Command | Purpose |
+| --- | --- |
+| `make help` | List available targets |
+| `make up` | Build and start PostgreSQL and FastAPI |
+| `make down` | Stop backend containers without deleting data |
+| `make logs` | Follow PostgreSQL and API logs |
+| `make test` | Run backend and frontend tests |
+| `make schema` | Render `schema.puml` as `schema.svg` |
+| `make frontend-run` | Run the Tkinter client from source |
+| `make frontend-build` | Build the PyInstaller application |
+| `make deb` | Build the Debian installer |
+| `make deb-info` | Display Debian package metadata |
+| `make docs` | Build the User and Developer Manuals |
+
+## 📁 Repository structure
 
 ```text
 .
-├── database.py
-├── main.py
-├── models.py
-├── schemas.py
-├── init.sql
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── requirements-dev.txt
-├── tests/
+├── .github/workflows/          # CI, documentation and release automation
+├── documentation/
+│   ├── images/                 # User and developer manual screenshots
+│   ├── proposal.pdf            # Approved proposal with original sketches
+│   ├── user-manual.tex         # User Manual source
+│   └── developer-manual.tex    # Developer Manual source
 ├── frontend/
-├── Pdf files/
-│   └── Proposal.pdf
-├── proposal-template/
-├── example-documentation/
-├── src/
-├── style/
-├── Makefile
+│   ├── packaging/              # Desktop launcher definition
+│   ├── src/fittracker_frontend/ # Modular Tkinter application
+│   ├── tests/                  # Frontend API-client tests
+│   ├── pyproject.toml
+│   └── uv.lock
+├── style/thga-db.sty           # THGA LaTeX design package
+├── tests/                      # Backend and database tests
+├── database.py                 # SQLAlchemy engine and sessions
+├── models.py                   # ORM models and constraints
+├── schemas.py                  # Pydantic request/response schemas
+├── main.py                     # FastAPI routes and authentication
+├── init.sql                    # PostgreSQL schema and seed data
+├── queries.sql                 # Example relational queries
+├── schema.puml                 # Relational schema source
+├── Dockerfile                  # Non-root FastAPI image
+├── docker-compose.yml          # PostgreSQL and API services
+├── Makefile                    # Development, test, build and documentation commands
+├── LICENSE                     # MIT License
 └── README.md
 ```
 
-The HTML file currently inside `frontend/` is an early prototype only. It is not
-part of the final application. The final frontend will be implemented using
-Python and Tkinter and packaged as a Debian `.deb` installer.
+Generated files such as `.env`, `out/`, virtual environments, test caches,
+PyInstaller output and Debian packages are excluded from Git.
 
-## Security
+## 🔐 Security notes
 
-Database credentials and the API key are stored in `.env`.
+- Real database credentials and the API key are stored only in `.env`.
+- `.env` is excluded from Git; only `.env.example` is committed.
+- Write endpoints reject missing or incorrect API keys.
+- API-key comparison uses a timing-safe comparison.
+- The API container runs as an unprivileged Linux user.
+- PostgreSQL is not exposed to the host network by Docker Compose.
+- Use long random secrets and do not commit or publish them.
 
-The real `.env` file is excluded from Git. Only `.env.example`, containing
-placeholder values, is committed.
+The current API key protects the application as a whole; it is not individual
+user authentication. The default deployment uses local HTTP and should not be
+exposed directly to the public internet.
 
-Never commit real passwords or API keys.
+## 📌 Project status and roadmap
 
-## Current status
+The complete project core is implemented and tested:
 
-Completed:
+- PostgreSQL schema, constraints, queries and persistent storage
+- FastAPI endpoints and `X-API-Key` protection
+- Docker Compose deployment
+- Modular Tkinter frontend
+- Debian package creation and installation
+- Automated backend, frontend and Docker checks
+- Documentation and release workflows
+- Approved proposal, User Manual and Developer Manual
 
-- PostgreSQL schema and seed data
-- Four SQLAlchemy models
-- Four required FastAPI endpoints
-- X-API-Key authentication
-- Docker and Docker Compose configuration
-- JOIN and volume aggregation
-- Automated backend tests
-- Successful Docker test on Ubuntu
+Possible future extensions documented in the Developer Manual include:
 
-Remaining:
+- Deleting workout sessions through a protected API endpoint
+- Creating and selecting multiple application users
+- Per-user authentication and authorization
+- Body-measurement and training-goal tables
+- An optional Android client using the same REST API
 
-- Tkinter desktop frontend
-- Debian `.deb` packaging
-- GitHub Actions
-- Final technical documentation
-- Complete Debian installation test
-- 8–10 minute demonstration video
+## 📄 License
 
-## Sources and reuse
+This project is available under the [MIT License](LICENSE).
 
-The project structure and Docker/FastAPI patterns are based on the examples from
-the DBMS lectures and exercises, particularly DBMS_08, DBMS_09 and lecture 10.
-The THGA LaTeX style and documentation templates originate from the provided
-DBMS_10 course repository.
+## 🙏 Sources and reuse
+
+The architecture and development workflow build on concepts taught in the DBMS
+lectures and exercises, especially the PostgreSQL, FastAPI, Docker Compose,
+Tkinter, packaging and API-key examples. The THGA LaTeX style originates from
+the supplied DBMS course material and is retained to format the project manuals.
