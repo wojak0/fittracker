@@ -10,7 +10,7 @@
 \setlength{\headheight}{22pt}
 
 \renewcommand{\thgaKurs}{Fit Tracker - Developer Manual}
-\renewcommand{\thgaDatum}{Version 0.1.2}
+\renewcommand{\thgaDatum}{Version 1.0.0}
 \addto\captionsenglish{%
   \renewcommand{\contentsname}{Contents}%
   \renewcommand{\figurename}{Figure}%
@@ -51,7 +51,7 @@
 \thispagestyle{empty}
 \fitTrackerTitle
   {Fit Tracker - Developer Manual}
-  {Architecture, implementation, testing and maintenance - Version 0.1.2}
+  {Architecture, implementation, testing and maintenance - Version 1.0.0}
 
 \begin{infobox}
 \begin{tabularx}{\linewidth}{@{}>{\bfseries}l X@{}}
@@ -68,7 +68,7 @@ Repository: & \url{https://github.com/wojak0/fittracker}
 \begin{beispielbox}
 \textbf{Purpose of this manual.}
 This document gives a developer enough information to understand, reproduce,
-test, maintain and extend Fit Tracker. It describes the actual version 0.1.2
+test, maintain and extend Fit Tracker. It describes the actual version 1.0.0
 source tree and records the design decisions that protect data integrity.
 \end{beispielbox}
 
@@ -118,7 +118,7 @@ The normal request path is:
 
 \begin{warnbox}
 The API key is authorization for write operations, not user authentication.
-Version 0.1.2 intentionally contains one seeded user and no registration or
+Version 1.0.0 intentionally contains one seeded user and no registration or
 role model. Do not describe the current key as a password for a user account.
 \end{warnbox}
 
@@ -453,7 +453,7 @@ form.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.76\linewidth]{04-automated-tests.png}
-  \caption{Version 0.1.2 passes eight backend and six frontend tests.}
+  \caption{Version 1.0.0 passes eight backend and six frontend tests.}
 \end{figure}
 
 Run both suites from the repository root:
@@ -526,8 +526,8 @@ build dependencies, runs \texttt{make deb}, inspects the package, uploads a CI
 artifact and creates the release with generated notes.
 
 \begin{lstlisting}[caption={Creating a normal release after green tests}]
-git tag -a v0.1.2 -m "Fit Tracker v0.1.2"
-git push origin v0.1.2
+git tag -a v1.0.0 -m "Fit Tracker v1.0.0"
+git push origin v1.0.0
 \end{lstlisting}
 
 Never move an existing release tag. Correct the source, increment the version
@@ -591,7 +591,7 @@ the frontend dictionary after insertion.
 
 \subsection{Add another user}
 
-Version 0.1.2 has no registration route. An administrator can insert a user:
+Version 1.0.0 has no registration route. An administrator can insert a user:
 
 \begin{lstlisting}[language=SQL]
 INSERT INTO users (username, email)
@@ -680,7 +680,7 @@ not the Debian package.
 
 \section{Known limitations}
 
-Version 0.1.2 intentionally does not provide workout editing or deletion, user
+Version 1.0.0 intentionally does not provide workout editing or deletion, user
 registration, per-user login, database migrations, a web frontend, an Android
 client or HTTPS termination. The current API creates a workout before its
 exercise entries and therefore cannot guarantee whole-session atomicity across

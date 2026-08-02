@@ -10,7 +10,7 @@
 **Lecturer:** Stephan Bökelmann  
 **Institution:** Technische Hochschule Georg Agricola (THGA), Bochum  
 **Semester:** Summer Term 2026  
-**Current version:** 0.1.2
+**Current version:** 1.0.0
 
 Fit Tracker is a self-hosted strength-training tracker built with PostgreSQL,
 FastAPI and a Tkinter desktop client. It records workout sessions, exercises,
@@ -172,11 +172,11 @@ The API should report `Up`, and PostgreSQL should report `healthy`.
 
 ## 🖥️ Installing and using the desktop frontend
 
-Download `fittracker-frontend_0.1.2_amd64.deb` from the latest GitHub Release,
+Download `fittracker-frontend_1.0.0_amd64.deb` from the latest GitHub Release,
 then install it with APT:
 
 ```bash
-sudo apt install ./fittracker-frontend_0.1.2_amd64.deb
+sudo apt install ./fittracker-frontend_1.0.0_amd64.deb
 ```
 
 Start the application from the desktop application menu or from a terminal:
@@ -298,7 +298,7 @@ make deb
 The generated installer is written to:
 
 ```text
-frontend/dist/fittracker-frontend_0.1.2_amd64.deb
+frontend/dist/fittracker-frontend_1.0.0_amd64.deb
 ```
 
 Inspect its package metadata:

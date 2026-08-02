@@ -10,7 +10,7 @@
 \setlength{\headheight}{22pt}
 
 \renewcommand{\thgaKurs}{Fit Tracker - User Manual}
-\renewcommand{\thgaDatum}{Version 0.1.2}
+\renewcommand{\thgaDatum}{Version 1.0.0}
 \addto\captionsenglish{%
   \renewcommand{\contentsname}{Contents}%
   \renewcommand{\figurename}{Figure}%
@@ -50,7 +50,7 @@
 \selectlanguage{english}
 \thispagestyle{empty}
 \fitTrackerTitle{Fit Tracker - User Manual}%
-{Installation, daily operation and troubleshooting - Version 0.1.2}
+{Installation, daily operation and troubleshooting - Version 1.0.0}
 
 \begin{infobox}
 \textbf{Author:} Ahmad Hoteit \\
@@ -271,10 +271,10 @@ Open the latest project release and download the \texttt{amd64.deb} asset:
 \url{https://github.com/wojak0/fittracker/releases/latest}
 \end{center}
 
-For version 0.1.2 the filename is:
+For version 1.0.0 the filename is:
 
 \begin{center}
-\texttt{fittracker-frontend\_0.1.2\_amd64.deb}
+\texttt{fittracker-frontend\_1.0.0\_amd64.deb}
 \end{center}
 
 \subsection{Install the package}
@@ -283,7 +283,7 @@ Assuming the browser saved the file in \texttt{Downloads}, run:
 
 \begin{lstlisting}[caption={Installing the Fit Tracker frontend}]
 cd ~/Downloads
-sudo apt install ./fittracker-frontend_0.1.2_amd64.deb
+sudo apt install ./fittracker-frontend_1.0.0_amd64.deb
 \end{lstlisting}
 
 Using \texttt{apt install} rather than \texttt{dpkg -i} allows APT to resolve
@@ -296,7 +296,7 @@ dpkg -s fittracker-frontend | grep -E '^(Status|Version|Architecture):'
 \end{lstlisting}
 
 The expected status is \texttt{install ok installed}, architecture
-\texttt{amd64} and version \texttt{0.1.2}.
+\texttt{amd64} and version \texttt{1.0.0}.
 
 % ============================================================
 \section{Launch and connect}
@@ -351,7 +351,7 @@ stop Docker or delete any data.
 
 The main window contains a \textbf{User ID} field and three tabs:
 \textbf{Workout History}, \textbf{Log Workout} and
-\textbf{Exercise Dictionary}. Version 0.1.2 provides the seeded demo user, so
+\textbf{Exercise Dictionary}. Version 1.0.0 provides the seeded demo user, so
 leave the User ID set to \texttt{1}.
 
 \subsection{Review an empty workout history}
@@ -378,7 +378,7 @@ the backend.
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.97\linewidth]{03-exercise-dictionary.png}
-  \caption{The 15 seeded exercises in version 0.1.2.}
+  \caption{The 15 seeded exercises in version 1.0.0.}
   \label{fig:dictionary}
 \end{figure}
 
@@ -575,7 +575,7 @@ to \texttt{http://localhost:8890}.
 \subsection{User not found}
 
 The supplied database initializes demo user \texttt{1}. Ensure the User ID
-field contains \texttt{1}. User registration is not part of version 0.1.2.
+field contains \texttt{1}. User registration is not part of version 1.0.0.
 
 \subsection{Only five exercises appear after an upgrade}
 
@@ -632,7 +632,7 @@ The following checklist provides a complete functional test:
 \section{Current scope and limitations}
 % ============================================================
 
-Version 0.1.2 intentionally implements the approved term-project scope:
+Version 1.0.0 intentionally implements the approved term-project scope:
 
 \begin{itemize}[leftmargin=1.4em]
   \item one seeded demo user with User ID 1;
