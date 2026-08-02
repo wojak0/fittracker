@@ -87,6 +87,7 @@ deb: frontend-build
 		--architecture $(FRONTEND_ARCH) \
 		--description "Tkinter desktop frontend for the Fit Tracker REST API" \
 		--maintainer "Ahmad Hoteit" \
+		--license MIT \
 		--url "https://github.com/wojak0/fittracker" \
 		--depends libc6 \
 		--depends libx11-6 \
