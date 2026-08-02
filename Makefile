@@ -22,7 +22,7 @@ STYLE := style/thga-db.sty
 
 vpath %.tex src proposal-template example-documentation documentation
 
-DOCS := dbms_10 proposal documentation user-manual
+DOCS := dbms_10 proposal documentation user-manual developer-manual
 ALL_PDF := $(addprefix $(OUTDIR)/, $(addsuffix .pdf, $(DOCS)))
 
 
