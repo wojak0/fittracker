@@ -625,50 +625,309 @@ Create and verify a backup first. A normal shutdown uses
 \texttt{docker compose down} without \texttt{-v}.
 \end{warnbox}
 
-\section{Planned extension points}
+\newpage
+\section{Extension cookbook}
 
-\subsection{Delete a workout}
+This section is a practical handover guide. It explains where a developer must
+work when adding a new query, API route, desktop view, button or relational
+table. A feature is complete only when its database behavior, HTTP contract,
+desktop behavior, tests and documentation agree.
 
-The database already cascades deletion from a workout to its performance
-entries. A safe feature requires all of the following:
+\subsection{Impact map for a normal feature}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}
+  >{\bfseries\raggedright\arraybackslash}p{0.20\linewidth}
+  >{\raggedright\arraybackslash}p{0.31\linewidth}
+  >{\raggedright\arraybackslash}X@{}}
+\toprule
+Layer & Main source & Required responsibility \\
+\midrule
+Database & \filepath{init.sql}, \filepath{models.py} & Define keys, types, constraints and ORM relationships. \\
+HTTP contract & \filepath{schemas.py}, \filepath{main.py} & Validate input, query through a session, authorize writes and return documented status codes. \\
+Desktop HTTP & \filepath{frontend/.../api.py} & Add one typed client method and keep URL construction outside the GUI. \\
+Desktop view & \filepath{frontend/.../ui.py} & Build widgets, validate input, run network work in the background and refresh visible state. \\
+Verification & \filepath{tests/}, \filepath{frontend/tests/} & Test successful behavior, invalid input, authorization and important database constraints. \\
+Handover & schema diagram, manuals, README & Describe the feature and regenerate affected screenshots or diagrams. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+The recommended implementation order is database constraint, ORM model,
+Pydantic schema, FastAPI route, API-client method, Tkinter view, tests and
+documentation. This order prevents the GUI from defining rules that the
+database does not enforce.
+
+\subsection{Add a new read-only query and API route}
+
+Assume a future Statistics tab needs the number of workouts and the total
+training volume for one user. First add an explicit response model to
+\filepath{schemas.py}:
+
+\begin{lstlisting}[language=Python,caption={Response contract for a statistics query}]
+class WorkoutStatistics(BaseModel):
+    workout_count: int = Field(ge=0)
+    total_volume_kg: Decimal = Field(ge=0)
+\end{lstlisting}
+
+Then add a read route to \filepath{main.py}. Counting distinct workout IDs is
+important because joining performance rows would otherwise count one workout
+several times.
+
+\newpage
+\begin{lstlisting}[language=Python,caption={SQLAlchemy aggregate route skeleton}]
+@app.get(
+    "/users/{user_id}/statistics",
+    response_model=schemas.WorkoutStatistics,
+)
+def get_user_statistics(user_id: int, db: Session = Depends(get_db)):
+    if db.get(models.User, user_id) is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    row = (
+        db.query(
+            func.count(func.distinct(models.Workout.workout_id)),
+            func.coalesce(func.sum(
+                models.WorkoutExercise.sets
+                * models.WorkoutExercise.reps
+                * models.WorkoutExercise.weight_kg
+            ), 0),
+        )
+        .select_from(models.Workout)
+        .outerjoin(models.WorkoutExercise)
+        .filter(models.Workout.user_id == user_id)
+        .one()
+    )
+    return {
+        "workout_count": row[0],
+        "total_volume_kg": row[1],
+    }
+\end{lstlisting}
+
+Expose the route in \filepath{api.py}; UI code should never assemble endpoint
+paths itself:
+
+\begin{lstlisting}[language=Python]
+def get_statistics(self, user_id: int) -> dict[str, Any]:
+    return self.request("GET", f"/users/{user_id}/statistics")
+\end{lstlisting}
+
+Add backend tests for a user with no workouts, a user with several exercises
+and an unknown user. Add a frontend client test that asserts the exact method,
+path and absence of the API-key header on this read request. Finally, inspect
+the generated example in \texttt{/docs} and run \texttt{make test}.
+
+\subsection{Add a new Tkinter view and button}
+
+A fourth Statistics tab belongs in \filepath{ui.py}. Create its frame in
+\texttt{\_build\_main\_screen}, add it to the existing notebook and delegate
+the widget construction to its own method:
+
+\begin{lstlisting}[language=Python,caption={Registering another desktop view}]
+self.statistics_tab = ttk.Frame(self.notebook, padding=15)
+self.notebook.add(self.statistics_tab, text="Statistics")
+self._build_statistics_tab()
+\end{lstlisting}
+
+Inside \texttt{\_build\_statistics\_tab}, keep widget variables on
+\texttt{self} when another callback must update them. A refresh button follows
+the same pattern as the existing history button:
+
+\begin{lstlisting}[language=Python,caption={Button and callback pattern}]
+self.statistics_refresh_button = ttk.Button(
+    toolbar,
+    text="Refresh statistics",
+    command=self.load_statistics,
+)
+self.statistics_refresh_button.pack(side=tk.RIGHT)
+\end{lstlisting}
+
+The \texttt{load\_statistics} callback must validate the user ID with
+\texttt{\_get\_user\_id}. It calls the API client's statistics method through
+\texttt{\_run\_background} and updates labels only in the success callback on
+the Tk thread. Pass the button to \texttt{\_run\_background} so it is disabled
+while the request runs. Display an \texttt{ApiError} through the existing
+message-box path and do not modify widgets from a worker thread.
+
+For a write button such as Delete selected, additionally require an explicit
+confirmation dialog, call a protected \texttt{ApiClient} method and refresh the
+view only after the server confirms success. Test the callback with a fake API
+client; do not require a live Docker service in frontend unit tests.
+
+\subsection{Add a PostgreSQL reporting view}
+
+If repeated reports need the same aggregate, a read-only PostgreSQL view can
+centralize it. For example:
+
+\begin{lstlisting}[language=SQL,caption={Example reporting view}]
+CREATE VIEW workout_volume_summary AS
+SELECT
+    w.workout_id,
+    w.user_id,
+    w.workout_date,
+    CAST(COALESCE(
+        SUM(we.sets * we.reps * we.weight_kg), 0
+    ) AS NUMERIC(12, 2)) AS total_volume_kg
+FROM workouts AS w
+LEFT JOIN workout_exercises AS we
+    ON we.workout_id = w.workout_id
+GROUP BY w.workout_id, w.user_id, w.workout_date;
+\end{lstlisting}
+
+Add the statement to \filepath{init.sql} only for fresh installations. For an
+existing volume, add a versioned migration, back up the database and execute
+the migration once. Query the view read-only from \filepath{main.py}, or map it
+as a read-only SQLAlchemy table with \texttt{workout\_id} declared as the
+logical key. Add a database test that compares view output with a hand-calculated
+session, update the schema documentation and never use a view to bypass write
+validation.
+
+\subsection{Add a new relational table}
+
+The concrete example below adds body measurements. The database definition
+must be designed before the form:
+
+\begin{lstlisting}[language=SQL,caption={Body-measurement table design}]
+CREATE TABLE body_measurements (
+    measurement_id INTEGER GENERATED BY DEFAULT AS IDENTITY
+        PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    measurement_date DATE NOT NULL,
+    weight_kg NUMERIC(5, 2) NOT NULL
+        CHECK (weight_kg > 0),
+    notes TEXT,
+    CONSTRAINT fk_measurements_user
+        FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT uq_measurement_user_date
+        UNIQUE (user_id, measurement_date)
+);
+\end{lstlisting}
+
+Implementation steps for this table are:
 
 \begin{enumerate}
-  \item add \texttt{DELETE /workouts/\{workout\_id\}} protected by the API key;
-  \item return 404 for an unknown workout and 204 after deletion;
-  \item ensure the requested workout belongs to the intended user;
-  \item add backend authorization, cascade and not-found tests;
-  \item add a selected-history delete button with an explicit confirmation; and
-  \item refresh the history only after a successful response.
+  \item add the table to \filepath{init.sql} for clean installations and add a
+        tracked migration for existing databases;
+  \item add a \texttt{BodyMeasurement} model plus the matching
+        \texttt{User.measurements} relationship in \filepath{models.py};
+  \item add \texttt{BodyMeasurementCreate} and \texttt{BodyMeasurementRead}
+        schemas with date, range and note-length validation;
+  \item implement read and protected create routes below in \filepath{main.py};
+  \item add corresponding methods in \filepath{api.py} and a Measurements tab
+        in \filepath{ui.py};
+  \item test the foreign key, positive-weight check, per-day uniqueness,
+        authorization, 404 behavior and normal create/read workflow; and
+  \item update \filepath{schema.puml}, both manuals and screenshots.
 \end{enumerate}
 
-Do not implement deletion only in the GUI or by connecting the client directly
-to PostgreSQL.
+\begin{lstlisting}[caption={Measurement endpoint contract}]
+GET  /users/{user_id}/measurements
+POST /users/{user_id}/measurements
+\end{lstlisting}
+
+The current project has no migration framework. A first production step would
+be to add Alembic. Until then, a reviewed SQL file such as
+\filepath{migrations/001\_body\_measurements.sql} should run inside a
+transaction after a verified backup. Editing \filepath{init.sql} alone does
+not change an existing named Docker volume.
+
+\section{Planned extension points}
+
+If more development time were available, the following improvements would be
+implemented in this order. Each item states both the benefit and the concrete
+work required; they are proposals, not functions claimed by version 1.0.0.
+
+\subsection{Atomic workout-session creation}
+
+This is the highest reliability priority. Version 1.0.0 creates the workout
+first and then sends one request for each exercise. A network failure can
+therefore leave a workout with only some entries. Add a
+\texttt{WorkoutSessionCreate} schema containing the workout fields and a list
+of exercises, then implement one protected \texttt{POST /workout-sessions}
+route. The route should add the workout, call \texttt{db.flush()} to obtain its
+ID, add every \texttt{WorkoutExercise} and commit once. Any exception must roll
+back the complete session. Replace the frontend's sequence of requests with
+one client method and test success, duplicate exercises, invalid IDs and a
+forced mid-transaction failure.
+
+\subsection{Delete a workout safely}
+
+The database already cascades deletion from \texttt{workouts} to
+\texttt{workout\_exercises}. The feature should be implemented across all
+layers:
+
+\begin{enumerate}
+  \item add protected
+        \texttt{DELETE /users/\{user\_id\}/workouts/\{workout\_id\}} in
+        \filepath{main.py}; query by both IDs, return 404 when the pair does not
+        exist, call \texttt{db.delete}, commit and return HTTP 204;
+  \item add \texttt{delete\_workout} to \filepath{api.py} with
+        \texttt{protected=True};
+  \item preserve each hidden workout ID in the history tree, for example as the
+        Treeview item ID, so the selected row identifies the correct record;
+  \item add a Delete selected button in \filepath{ui.py}, require a confirmation
+        dialog and call the API in \texttt{\_run\_background};
+  \item refresh history only after HTTP 204; and
+  \item test authorization, correct-user deletion, wrong-user/unknown IDs,
+        database cascade, confirmation cancellation and successful refresh.
+\end{enumerate}
+
+Do not delete directly from Tkinter or connect the desktop client to
+PostgreSQL. The user ID path check limits accidental cross-user deletion, but
+real ownership protection still requires the authentication work below.
 
 \subsection{User registration and authentication}
 
-Add request schemas, unique-conflict handling and endpoints for users. For a
-networked or public deployment, replace the shared write key with per-user
-authentication, password hashing or an external identity provider, and enforce
-ownership on every workout query and mutation.
+Add user-create and user-read schemas, unique-conflict handling and registration
+routes. Add a password-hash column through a migration; never store plaintext
+passwords. Replace the shared write key with per-user authentication such as a
+short-lived token issued after password verification, or integrate an external
+identity provider. Derive the user ID from the authenticated identity instead
+of accepting an arbitrary GUI field, filter every history and mutation query
+by that identity, and add tests proving that user A cannot read or change user
+B's records. The connection dialog must then collect the selected login method
+instead of a shared API key.
 
-\subsection{New measurements or goals table}
+\subsection{Measurements, goals and progress charts}
 
-A future \texttt{body\_measurements} table can reference \texttt{users} and
-store a measurement date, body weight and optional note. Introduce it with a
-real migration tool such as Alembic; do not edit a live database manually and
-assume \filepath{init.sql} performed the migration.
+Implement the \texttt{body\_measurements} table from the extension cookbook,
+then add a \texttt{goals} table with owner, target value, target date and status.
+Expose create/read/update routes, add API-client methods and build a Progress
+tab. A chart should consume API data rather than query PostgreSQL directly.
+Tests must cover ownership, date order, numeric constraints and empty datasets.
 
 \subsection{Android client}
 
-An Android application can reuse the HTTP API; the PostgreSQL and FastAPI
-backend still must run on a reachable computer or server. The phone must use
-that host's LAN or HTTPS address instead of \texttt{localhost}, and firewall,
-TLS and secret storage must be addressed. An Android installer would be an APK,
-not the Debian package.
+An Android client can reuse the stable JSON API after authentication and HTTPS
+are in place. Generate a client from \texttt{/openapi.json} or implement the
+same four operations explicitly, store tokens in Android secure storage and
+map API errors to user messages. PostgreSQL and FastAPI still run on a reachable
+computer or server; the phone uses that host's LAN or HTTPS address instead of
+\texttt{localhost}. Add CORS only if a browser-based client needs it. Test on a
+disposable backend and publish an APK separately from the Debian package.
+
+\subsection{Recommended implementation priority}
+
+\begin{center}
+\small
+\begin{tabularx}{\linewidth}{@{}c >{\bfseries}p{0.29\linewidth} X@{}}
+\toprule
+Priority & Improvement & Reason \\
+\midrule
+1 & Atomic session endpoint & Removes the most important partial-write risk. \\
+2 & Workout deletion & Completes a common daily workflow with limited schema change. \\
+3 & Per-user authentication & Required before untrusted network or multi-user use. \\
+4 & Measurements and goals & Adds useful functionality using the established layer pattern. \\
+5 & Android client & Valuable only after the remote API is securely deployable. \\
+\bottomrule
+\end{tabularx}
+\end{center}
 
 \section{Security and reliability notes}
 
-\begin{itemize}
+\begin{itemize}[itemsep=0.35em]
   \item Keep \filepath{.env}, backups and real credentials outside Git.
   \item Use HTTPS and a reverse proxy before exposing the API beyond a trusted network.
   \item Replace development keys before demonstrations or deployments.
@@ -704,7 +963,7 @@ Before handing a new version to another developer, confirm:
   \item version numbers and release filenames match.
 \end{enumerate}
 
-\subsection*{Maintenance impact map}
+\subsection{Maintenance impact map}
 
 \begin{center}
 \small
