@@ -180,6 +180,13 @@ nano .env
 Replace both placeholders. The password used in \texttt{POSTGRES\_PASSWORD}
 must also appear in the password part of \texttt{DATABASE\_URL}.
 
+For the simplest first-time setup, use a database password made from letters,
+digits, underscores and hyphens. Characters such as \texttt{@}, \texttt{:},
+\texttt{/}, \texttt{\#} or \texttt{\%} have a special meaning inside a URL and
+must be percent-encoded if they are used in the password part of
+\texttt{DATABASE\_URL}. The API key may be a separate long, random,
+URL-safe value.
+
 \begin{lstlisting}[caption={Structure of .env - use private values}]
 POSTGRES_USER=fittracker
 POSTGRES_PASSWORD=CHOOSE_A_STRONG_PASSWORD
@@ -246,11 +253,30 @@ A successful response is a JSON list containing 15 exercises. Opening only
 \url{http://localhost:8888} returns \texttt{"detail":"Not Found"}; this is
 expected because the API intentionally has no route at \texttt{/}.
 
+\subsection{Verify write protection without changing data}
+\label{sec:api-key-test}
+
+The exercise list and workout history are public read endpoints. Creating a
+workout is a protected write operation and requires the correct
+\texttt{X-API-Key}. The following non-destructive test deliberately sends an
+incorrect key:
+
+\begin{lstlisting}[caption={Testing the protected workout endpoint}]
+curl -i -X POST http://localhost:8888/workouts \
+  -H "X-API-Key: deliberately-wrong-key" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":1,"workout_date":"2026-08-05","notes":"Unauthorized test"}'
+\end{lstlisting}
+
+The expected status is \texttt{HTTP/1.1 401 Unauthorized}. The response message
+is \texttt{Invalid or missing API key}, and no workout is created. This test
+proves that write requests are protected before the desktop frontend is used.
+
 \subsection{Initial database content}
 
 A newly initialized database contains:
 
-\begin{itemize}[leftmargin=1.4em]
+\begin{itemize}[leftmargin=1.4em,nosep]
   \item one demo user with \texttt{user\_id = 1};
   \item 15 seeded exercises; and
   \item no workout history.
@@ -334,6 +360,15 @@ X-API-Key & The exact value of \texttt{API\_KEY} from the backend's \texttt{.env
 
 Click \textbf{Connect}. The key is masked while typing, retained only for the
 current application session and never written to disk by the frontend.
+
+\begin{infobox}
+\textbf{What Connect verifies.} The connection step requests the public
+\texttt{/exercises} endpoint, so it verifies the API URL and availability. The
+API key is checked by the backend only when the first protected write is sent,
+for example when \textbf{Save Workout} is clicked. Therefore an incorrect but
+non-empty key can open the main window, but saving a workout then produces
+\texttt{HTTP 401}. Disconnect and reconnect with the correct key to continue.
+\end{infobox}
 
 \begin{infobox}
 \textbf{Remote backend.} If FastAPI runs on another machine, replace
@@ -420,7 +455,10 @@ The frontend validates the input before sending it:
   \item sets must be between 1 and 100;
   \item repetitions must be between 1 and 1000;
   \item weight must be between 0 and 9999.99 kg with at most two decimals;
-  \item the date must use a valid \texttt{YYYY-MM-DD} value; and
+        use a decimal point, for example \texttt{60.00}, not
+        \texttt{60,00};
+  \item the date must use a valid \texttt{YYYY-MM-DD} value;
+  \item notes are optional and may contain at most 2000 characters; and
   \item at least one exercise is required.
 \end{itemize}
 
@@ -554,7 +592,9 @@ restart with \texttt{docker compose up -d --build}.
 
 The entered key does not match \texttt{API\_KEY} in the backend's
 \texttt{.env}. Click \textbf{Disconnect}, re-enter the exact key and connect
-again. After changing \texttt{.env}, recreate the API container:
+again. The main window may initially open with a wrong key because Connect
+checks a public read endpoint; the 401 appears on the protected save request.
+After changing \texttt{.env}, recreate the API container:
 
 \begin{lstlisting}
 docker compose up -d --force-recreate api
@@ -607,6 +647,10 @@ To remove the backend containers \emph{and} permanently erase the database,
 run \texttt{docker compose down -v} only after confirming that the data is no
 longer needed.
 
+\textbf{Support information.} When reporting a problem, include the application
+version, operating system, the output of \texttt{docker compose ps} and the
+relevant container logs. Never include the real API key or database password.
+
 % ============================================================
 \section{Acceptance checklist}
 % ============================================================
@@ -618,14 +662,26 @@ The following checklist provides a complete functional test:
   \item \url{http://localhost:8888/docs} opens the FastAPI documentation.
   \item \texttt{/exercises} returns 15 exercises.
   \item \texttt{dpkg -s fittracker-frontend} reports an installed package.
-  \item The frontend connects with the configured URL and API key.
+  \item The frontend opens with the configured URL and a non-empty API key.
   \item User ID 1 initially has an empty history in a fresh database.
   \item The Exercise Dictionary displays all 15 exercises.
-  \item A workout containing two exercises can be saved.
+  \item In Log Workout, add one exercise to the pending table, select it and
+        confirm that \textbf{Remove Selected} removes it without saving.
+  \item Add an exercise again and confirm that attempting to add the same
+        exercise twice displays the duplicate-exercise validation message.
+  \item Enter an invalid value such as \texttt{-1} kg and confirm that the
+        frontend rejects it. Then enter valid values and add two different
+        exercises.
+  \item Save the workout with the correct key and confirm that the success
+        dialog appears.
   \item The history shows both exercises and the correct total volume.
+  \item Click \textbf{Disconnect}, reconnect and confirm that the main window
+        and saved history load again.
   \item After \texttt{docker compose down} followed by
         \texttt{docker compose up -d}, the saved workout is still present.
-  \item A write request with a missing or incorrect API key returns HTTP 401.
+  \item Run the deliberately incorrect-key command from
+        Section~\ref{sec:api-key-test} and confirm HTTP 401 without creating
+        another workout.
 \end{enumerate}
 
 % ============================================================
@@ -646,12 +702,5 @@ Version 1.0.0 intentionally implements the approved term-project scope:
 These limitations do not prevent the documented core workflow. Possible future
 extensions include user management, deleting workouts and a mobile client that
 connects to a securely hosted backend.
-
-\section*{Support information}
-\addcontentsline{toc}{section}{Support information}
-
-When reporting a problem, include the application version, operating system,
-the output of \texttt{docker compose ps} and the relevant container logs. Never
-include the real API key or database password.
 
 \end{document}
